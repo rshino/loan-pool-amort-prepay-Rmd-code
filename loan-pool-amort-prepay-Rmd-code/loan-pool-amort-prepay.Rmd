@@ -1,10 +1,10 @@
 ---
-title: "Loan Pool Amortization & Prepay"
+title: "Mortgage Loan & Pool Amortization & Prepay Mechanics"
 author: "Rei Shinozuka rei@reishinozuka.com"
-date: "2025-05-10"
+date: "2025-05-11"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -23,13 +23,14 @@ cpr12.col<-"deepskyblue4"
 cex.size<-0.75
 ```
 
-```{r parameters}
+```{r mortgage.parameters}
+# mortgage parameters used in the loan and pool examples
 orig.term<-360
-note.rate<-0.06
+note.rate<-0.06     # e.g., 0.06 == 6% annual note rate, or 0.5% monthly rate (no compounding used)
 orig.bal<-100000
-scalar.cpr<-0.06 
+scalar.cpr<-0.06    # flat life CPR, e.g., 0.06 == 6% conditional prepay rate which is an annual compounded rate
 cpr<-replicate(orig.term,scalar.cpr)
-# parameter string equivalents
+# parameter string equivalents to basic parameters
 scalar.smm<-1-(1-scalar.cpr)^(1/12)
 note.rate.str<-sprintf("%5.2f%%",note.rate*100)
 orig.bal.str<-prettyNum(orig.bal,big.mark=",", scientific=FALSE)
@@ -60,25 +61,29 @@ level.pay.calc<-function(rem.term,monthly.rate)
 ```
 
 ```{r amort.loan.cf_f}
+# amort.loan.cf(orig.term,note.rate,orig.bal,cpr=c(NA),mo.borrower.pay=NA) 
+# ======================================================================
 # amortize single loan incorporating prepayments
-# CPR == 1 signifies paid-in-full
-# 0 < CPR < 1 are curtailments
+# orig.term = mortgage term in months
+# note rate = 
+#   CPR == 1 signifies paid-in-full
+#   0 < CPR < 1 are curtailments
 # mo.borrower.pay is used to model when the borrower sets his own monthly level payment higher than the scheduled
 # payment, e.g., rounding to the next $100 or $1000. when mo.borrower.pay is set, then cpr is not used
 # 
 amort.loan.cf<-function(orig.term,note.rate,orig.bal,cpr=c(NA),mo.borrower.pay=NA)
 {
   monthly.rate<-note.rate/12
-  level.pay<-level.pay.calc(orig.term,monthly.rate)*orig.bal
-  if(!is.na(mo.borrower.pay) & mo.borrower.pay<level.pay){
-    print(sprintf("ERROR $%s mo.borrower.pay < $%s level.pay, ignoring",
+  level.pay<-level.pay.calc(orig.term,monthly.rate)*orig.bal                    # derive sched pay
+  if(!is.na(mo.borrower.pay) & mo.borrower.pay<level.pay){                      # error-check borrower pay
+    print(sprintf("ERROR $%s mo.borrower.pay < $%s level.pay, ignoring",        
           prettyNum(round(mo.borrower.pay,2),big.mark=",", scientific=FALSE),
           prettyNum(round(level.pay,2),big.mark=",", scientific=FALSE)
           ))
     mo.borrower.pay<-NA
   }
   
-  if(is.na(cpr[1]) | !is.na(mo.borrower.pay)){
+  if(is.na(cpr[1]) | !is.na(mo.borrower.pay)){                      
     smm<-replicate(orig.term,0)
   } else {
     smm<-1-(1-cpr)^(1/12)
@@ -365,7 +370,7 @@ title<-sprintf("%3.3f%% Loan Curtailments (at %3.1f%% CPR)",note.rate*100,cpr.eg
 plot.cfs(cfloan,title)
 ```
 
-## Differemces Modeling Cashflows and Prepayments of Loans and Pools
+## Differences Modeling Cashflows and Prepayments of Loans and Pools
 
 The growth of Mortgage-Based Securities (MBS) in the 1980s led to investors to evaluate mortgage loans as 
 pools of loans. The borrower's option to refinance the loan is to the investor a short call option. Reflecting this exposure, MBS investor reporting attempts to describe historical prepayments and investor analysis
@@ -510,24 +515,40 @@ The simulation interprets an SMM as the probability for an individual loan being
 
 4. The scheduled level payment is reduced by the scheduled level payments of those loans paying in full.
 
+```{r simulate.loan.pool_f}
+# simulate.loan.pool(orig.term,note.rate,orig.bal,scalar.cpr,loan.count)
+# convert prepayments to probabilities, CPR is probability a loan will prepay in full in the year,
+# SMM the probabilty a loan will prepay in the month. For each loan, randomly simulate a projected 
+# time series of binary payment outcomes, 1.0 for paid in full and 0.0 for amortize. This series translates 
+# directly to CPR (or SMM, as the 0.0 and 1.0 are equivalent CPR and SMM) vectors which are passed 
+# into the amort.loan.cf() function. Each loan cashflow is aggregated into a pool cashflow. 
+# The resulting pool cashflow of discrete loan prepayments more closely resembles observable pool cashflows
+# than the continuous cashflows using the MBS pool convention, but converges with the MBS pool convention
+# as loan count exceeds 250 or more.
+# This simulation offers is no provision for curtailment.
+simulate.loan.pool<-function(orig.term,note.rate,orig.bal,scalar.cpr,loan.count){
+  cpr<-replicate(orig.term,scalar.cpr)
+  smm<-1-(1-cpr)^(1/12)
+
+  for(loan.no in 1:loan.count){
+    pifcpr<-runif(n=orig.term)  # uniformly random for each month 1:orig.term
+    pifcpr<-(pifcpr<smm)*1      # interpret smm as a probability of monthly PIF
+    cf1<-amort.loan.cf(orig.term,note.rate,orig.bal,pifcpr)
+    # accumulate individual loan cashflows to the pool level
+    if(loan.no==1){
+      cfsim<-cf1
+    } else {
+      cfsim<-cfsim+cf1
+    }
+  }
+  cfsim$mon<-cfsim$mon/loan.count
+  return(cfsim)
+}# simulate.loan.pool()
+```
+
 ```{r pool.simulation}
 set.seed(666)
-
-cpr<-replicate(orig.term,scalar.cpr)
-smm<-1-(1-cpr)^(1/12)
-
-for(loan.no in 1:loan.count){
-  pifcpr<-runif(n=orig.term)  # uniformly distributed random
-  pifcpr<-(pifcpr<smm)*1      # interpret smm as a probability
-  cf1<-amort.loan.cf(orig.term,note.rate,orig.bal,pifcpr)
-  # accumulate individual loan cashflows to the pool level
-  if(loan.no==1){
-    cfsim<-cf1
-  } else {
-    cfsim<-cfsim+cf1
-  }
-}
-cfsim$mon<-cfsim$mon/loan.count
+cfsim<-simulate.loan.pool(orig.term,note.rate,orig.bal,scalar.cpr,loan.count)
 ```
 
 ```{r pool.simulation.results}
@@ -545,9 +566,6 @@ title<-sprintf("%3.3f%% Loan Simulation vs MBS Convention, %d Loans %3.1f%% CPR"
 plot.comp.bals(cfsim,cfpool,title)
 
 ```
-
-
-
 
 ```{r calc.hist.cpr.f}
 # given a cashflow calculate 1-,3-,6- and 12-month CPR
@@ -718,7 +736,7 @@ plot.hist.cpr(cfsim,title)
 
 ### Parameters
 
-```{r parameters,eval=FALSE,echo=TRUE}
+```{r loan.parameters,eval=FALSE,echo=TRUE}
 ```
 
 ```{r pool.simulation.params,eval=FALSE,echo=TRUE}
@@ -739,6 +757,9 @@ plot.hist.cpr(cfsim,title)
 ```
 
 ```{r amort.pool,eval=FALSE,echo=TRUE}
+```
+
+```{r simulate.loan.pool_f,eval=FALSE,echo=TRUE}
 ```
 
 #### Loan Simulation Pool Cashflows 
@@ -766,3 +787,10 @@ plot.hist.cpr(cfsim,title)
 ```{r plot.hist.cpr_f,eval=FALSE,echo=TRUE}
 ```
 
+## Colophon
+
+```{r colophon,echo=TRUE,comment=''}
+print(sessionInfo())
+packinfo <- installed.packages(fields = c("Package", "Version"))
+print(packinfo[,  "Version", drop=F])
+```
