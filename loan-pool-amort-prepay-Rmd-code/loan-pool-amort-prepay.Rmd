@@ -47,7 +47,8 @@ loan.count<-250
 
 ```{r level.pay.calc_f}
 # level.pay.calc()
-# returns level (scheduled) payment given term to maturity and note.rate normalized to orig balance == 1.0
+# returns level (scheduled) payment given term to maturity and note.rate normalized to 
+# orig balance == 1.0
 level.pay.calc<-function(rem.term,monthly.rate)
 {
   if(monthly.rate==0.0) {
@@ -68,14 +69,15 @@ level.pay.calc<-function(rem.term,monthly.rate)
 # note rate = 
 #   CPR == 1 signifies paid-in-full
 #   0 < CPR < 1 are curtailments
-# mo.borrower.pay is used to model when the borrower sets his own monthly level payment higher than the scheduled
-# payment, e.g., rounding to the next $100 or $1000. when mo.borrower.pay is set, then cpr is not used
+# mo.borrower.pay is used to model when the borrower sets his own monthly level payment higher
+# than the scheduled payment, e.g., rounding to the next $100 or $1000. when mo.borrower.pay 
+# is set, then cpr is not used
 # 
 amort.loan.cf<-function(orig.term,note.rate,orig.bal,cpr=c(NA),mo.borrower.pay=NA)
 {
   monthly.rate<-note.rate/12
-  level.pay<-level.pay.calc(orig.term,monthly.rate)*orig.bal                    # derive sched pay
-  if(!is.na(mo.borrower.pay) & mo.borrower.pay<level.pay){                      # error-check borrower pay
+  level.pay<-level.pay.calc(orig.term,monthly.rate)*orig.bal            # derive sched pay
+  if(!is.na(mo.borrower.pay) & mo.borrower.pay<level.pay){              # error-check borrower pay
     print(sprintf("ERROR $%s mo.borrower.pay < $%s level.pay, ignoring",        
           prettyNum(round(mo.borrower.pay,2),big.mark=",", scientific=FALSE),
           prettyNum(round(level.pay,2),big.mark=",", scientific=FALSE)
@@ -519,12 +521,12 @@ The simulation interprets an SMM as the probability for an individual loan being
 # simulate.loan.pool(orig.term,note.rate,orig.bal,scalar.cpr,loan.count)
 # convert prepayments to probabilities, CPR is probability a loan will prepay in full in the year,
 # SMM the probabilty a loan will prepay in the month. For each loan, randomly simulate a projected 
-# time series of binary payment outcomes, 1.0 for paid in full and 0.0 for amortize. This series translates 
-# directly to CPR (or SMM, as the 0.0 and 1.0 are equivalent CPR and SMM) vectors which are passed 
-# into the amort.loan.cf() function. Each loan cashflow is aggregated into a pool cashflow. 
-# The resulting pool cashflow of discrete loan prepayments more closely resembles observable pool cashflows
-# than the continuous cashflows using the MBS pool convention, but converges with the MBS pool convention
-# as loan count exceeds 250 or more.
+# time series of binary payment outcomes, 1.0 for paid in full and 0.0 for amortize. This series
+# translates directly to CPR (or SMM, as the 0.0 and 1.0 are equivalent CPR and SMM) vectors which 
+# are passed into the amort.loan.cf() function. Each loan cashflow is aggregated into a pool cashflow. 
+# The resulting pool cashflow of discrete loan prepayments more closely resembles observable pool 
+# cashflows than the continuous cashflows using the MBS pool convention, but converges with the 
+# MBS pool convention as loan count exceeds 250 or more.
 # This simulation offers is no provision for curtailment.
 simulate.loan.pool<-function(orig.term,note.rate,orig.bal,scalar.cpr,loan.count){
   cpr<-replicate(orig.term,scalar.cpr)
@@ -552,7 +554,8 @@ cfsim<-simulate.loan.pool(orig.term,note.rate,orig.bal,scalar.cpr,loan.count)
 ```
 
 ```{r pool.simulation.results}
-title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",note.rate*100,loan.count,scalar.cpr*100)
+title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",
+                note.rate*100,loan.count,scalar.cpr*100)
 plot.cfs(cfsim,title)
 ```
 
@@ -575,9 +578,9 @@ plot.comp.bals(cfsim,cfpool,title)
 # 2   4960467.5 4921209.3  25440.68
 # ...
 # mon          = timeseries month (index):   cf[1,] represents the first cashflow
-# bbal         = beginning (actual) balance: cf[1,bbal] represents the original balance of loan or pool
-# ebal         = ending (actual) balance:    cf[1,ebal] represents the remaining balance after first payment
-# unsched.prin = unscheduled principal:      cf[1,unsched.prin] borrower payment in excess of scheduled payment
+# bbal         = beginning (actual) balance: cf[1,bbal] the original balance of loan or pool
+# ebal         = ending (actual) balance:    cf[1,ebal] the remaining balance after first payment
+# unsched.prin = unscheduled principal:      cf[1,unsched.prin] borrower payment excess of sched pay
 #                                            incorporates payments of full repayments and curtailments
 calc.hist.cpr<-function(cf){
   orig.term<-nrow(cf)
@@ -593,9 +596,9 @@ calc.hist.cpr<-function(cf){
   hist.cpr[bbal>0,uprin12:=uprin06+shift(unsched.prin,6)+shift(unsched.prin,7)+shift(unsched.prin,8)
            +shift(unsched.prin,9)+shift(unsched.prin,10)+shift(unsched.prin,11)]
   # determine 1-,3-,6-,12-mo scheduled ending balances for month m
-  # e.g., hist.cpr[m,sched.ebal01] is the scheduled balance projected from hist.cpr[m-1,ebal] assuming no prepayments
+  # e.g., hist.cpr[m,sched.ebal01] is the sched bal projected from hist.cpr[m-1,ebal] w/ 0 prepays
   #       sched.ebal01 for month m is m's ending balance plus m's unsched prin
-  #       sched.ebal03 for month m is m's ending balance plus unsched prin in month m, m-1 and m-2 (3 months)
+  #       sched.ebal03 for month m is m's ending balance plus unsched prin in month m, m-1, m-2 (3 mos)
   #       etc.
   hist.cpr[,sched.ebal01:=ebal+uprin01]
   hist.cpr[,sched.ebal03:=ebal+uprin03]
@@ -603,10 +606,10 @@ calc.hist.cpr<-function(cf){
   hist.cpr[,sched.ebal12:=ebal+uprin12]
   # SMM single monthly mortality
   # SMM is defined as unscheduled principal divided by scheduled balance (*SF1999* page SF-5).
-  # when calculating 3-,6- and 12-mo SMM, decompound total unsched over period to 1m equivalents such that
-  # e.g. smm03[m] ~= 1-(1-smm01[m])(1-smm01[m-1])(1-smm01[m-2])
-  # we signify ~= (approximate) because a constant 1m SMM for example is applied to balances which are 
-  # amortizing as well as prepaying
+  # when calculating 3-,6- and 12-mo SMM, decompound total unsched over period to 1m equivalents 
+  # such that, e.g. smm03[m] ~= 1-(1-smm01[m])(1-smm01[m-1])(1-smm01[m-2])
+  # we signify ~= (approximate) because a constant 1m SMM for example is applied to balances 
+  # which are amortizing as well as prepaying
   hist.cpr[,smm01:=uprin01/sched.ebal01]
   hist.cpr[,smm03:=1-(1-uprin03/sched.ebal03)^(1/3)]
   hist.cpr[,smm06:=1-(1-uprin06/sched.ebal06)^(1/6)]
@@ -659,7 +662,7 @@ plot.comp.bals<-function(cf,cf2,title){
 ```{r plot.hist.cpr_f}
 plot.hist.cpr<-function(cf,title=NA){
   par(mar=c(bottom=5, left=5, top=3, right=5) + 0.1) # bot, left, top, right in lines
-  maxy<-0.40 ## scale.axis.max(max(cf$int+cf$sched.prin+cf$unsched.prin))
+  maxy<-0.20 ## scale.axis.max(max(cf$int+cf$sched.prin+cf$unsched.prin))
   hist.cpr<-calc.hist.cpr(cf)
   plot(hist.cpr$mon,hist.cpr$cpr01,col=cpr01.col,type="l",lty=2,xlab="",
        main=title,cex.main=cex.size,
@@ -671,7 +674,8 @@ plot.hist.cpr<-function(cf,title=NA){
   axis(2, at = seq(0, maxy, maxy/4),
        sprintf("%3.0f%%",seq(0, maxy, maxy/4)*100),cex.axis=cex.size,las=1)
   par(new=TRUE)     # new plot on same canvas, for ending balance
-  plot(hist.cpr$mon,hist.cpr$ebal,type="l",col=ebal.col,xlab="", lty=2,ylab="",xaxt="n",yaxt="n",axes=FALSE,
+  plot(hist.cpr$mon,hist.cpr$ebal,type="l",col=ebal.col,xlab="", lty=2,ylab="",xaxt="n",yaxt="n",
+          axes=FALSE,
           cex.main=cex.size ## cex.axis=cex.size,cex.lab=cex.size
   )
   maxy2<-max(cf[!is.na(cf$bbal)]$bbal)
@@ -703,23 +707,33 @@ The pool loan simulation example will most closely resemble measurement of
 historical prepayments.
 
 ```{r loan.hist}
-# cfloan
-# cfpool
-# cfsim
 
 title<-sprintf("Single %3.3f%% Loan Cashflow %3.1f%% CPR Curtailments",note.rate*100,scalar.cpr*100)
 plot.hist.cpr(cfloan,title)
 
+```
+
+
+```{r pool.hist}
+
 title<-sprintf("MBS Convention %3.3f%% Pool Cashflows, %3.1f%% CPR",note.rate*100,scalar.cpr*100)
 plot.hist.cpr(cfpool,title)
 
-title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",note.rate*100,loan.count,scalar.cpr*100)
+```
+
+
+```{r sim.hist}
+
+
+title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",note.rate*100,
+               loan.count,scalar.cpr*100)
 plot.hist.cpr(cfsim,title)
 
 ```
 
 
 ### Amortization Functions
+
 
 #### Single Loan Amortization 
 
@@ -732,6 +746,11 @@ plot.hist.cpr(cfsim,title)
 #### MBS Convention Pool Amortization 
 
 ```{r amort.pool.cf_f,eval=FALSE,echo=TRUE}
+```
+
+#### Loan Simulation Pool Amortization 
+
+```{r simulate.loan.pool_f,eval=FALSE,echo=TRUE}
 ```
 
 ### Parameters
@@ -758,12 +777,6 @@ plot.hist.cpr(cfsim,title)
 
 ```{r amort.pool,eval=FALSE,echo=TRUE}
 ```
-
-```{r simulate.loan.pool_f,eval=FALSE,echo=TRUE}
-```
-
-#### Loan Simulation Pool Cashflows 
-
 
 ```{r pool.simulation,eval=FALSE,echo=TRUE}
 ```
