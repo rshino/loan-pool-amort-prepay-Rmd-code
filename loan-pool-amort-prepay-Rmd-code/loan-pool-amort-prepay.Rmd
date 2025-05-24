@@ -5,6 +5,7 @@ date: "2025-05-16"
 output:
   pdf_document: default
   html_document: default
+  fig_caption: true
 ---
 
 ```{r setup, include=FALSE}
@@ -13,7 +14,8 @@ output:
 library(dplyr)
 library(data.table)
 library(kableExtra)
-knitr::opts_chunk$set(echo = FALSE,fig.width=6,fig.height=2.85,dpi=300)
+library(nortest)
+knitr::opts_chunk$set(echo = FALSE,warning=FALSE,fig.width=6,fig.height=2.85,dpi=300)
 # global parameters are below
 # as demonstration code, we use global parameters for repeated exemplars
 sched.prin.col<-"paleturquoise3"
@@ -333,7 +335,7 @@ amortization, the balances at the end of each month are referred to as *schedule
 the scheduled payment each month is referred to as the *scheduled principal*.
 The payment window is the term of the loan.
 
-```{r amortization}
+```{r amortization,fig.cap='Scheduled Amortization'}
 cpr.eg<-0
 cprsingle<-replicate(orig.term,cpr.eg)
 cfloan<-amort.loan.cf(orig.term,note.rate,orig.bal,cprsingle)
@@ -880,14 +882,26 @@ plot.hist.cpr(big.cfsim,title,baseline.cpr=scalar.cpr)
 Example C in the prior section showed single simulation of a pool of mortgage loans.
 
 The simulations in this section
-execute 1,000 or more random trials of pool simulation in the manner of the last example. 
+execute 250 or more random trials of pool simulation in the manner of the last example. 
 We extract historical prepayments from the simulations and observe the distribution of 
-1-, 3-, 6-, and 12-month CPR. As is visible in the simulation CPR graphs shown under 
+1-, 3-, 6-, and 12-month CPR. For each prepayment term, the
+data are non-overlapping, i.e., the 12-month CPR values are spaced 12 months apart.
+
+As is visible in the simulation CPR graphs shown under 
 example C above, 
 the variation of CPRs grows dramatically 
 as the pool seasons and loan count drops. For this reason, we limit the CPRs in
 this analysis for the first *n* months, with the assumption that after 5-10 years, 
 loans would be pooled together into a large seasoned cohort for the purpose of prepayment analysis.
+
+We describe simulated data:
+
+* Histogram
+* Quantile-Quantile Plots
+* Statistical Tests for Normality
+
+In the statistical tests the null hypothesis H0 is that the data is normal. A p-value less than the significance threshold (0.01, 0.05) indicates 
+evidence that H0 (normality) is not true.
 
 ```{r sim.trials_f}
 # sim.trials(min.cutoff,max.cutoff,loan.count) ===========================================
@@ -897,11 +911,15 @@ loans would be pooled together into a large seasoned cohort for the purpose of p
 sim.trials<-function(min.cutoff=1,max.cutoff,loan.count){
   cfsim<-simulate.loan.pool.f(orig.term,note.rate,orig.bal,scalar.cpr,loan.count)
   hist.cpr<-calc.hist.cpr(cfsim)
+  months<-nrow(hist.cpr)
   return(list(
-        list(hist.cpr[min.cutoff:max.cutoff,cpr01]),
-        list(hist.cpr[min.cutoff:max.cutoff,cpr03]),
-        list(hist.cpr[min.cutoff:max.cutoff,cpr06]),
-        list(hist.cpr[min.cutoff:max.cutoff,cpr12]))
+        list(hist.cpr[seq(pmax(min.cutoff,1),pmin(max.cutoff,months),by=1),cpr01]),
+        list(hist.cpr[seq(pmax(min.cutoff,3),pmin(max.cutoff,months),by=3),cpr03]),
+        list(hist.cpr[seq(pmax(min.cutoff,6),pmin(max.cutoff,months),by=6),cpr06]),
+        list(hist.cpr[seq(pmax(min.cutoff,12),pmin(max.cutoff,months),by=12),cpr12]))
+        #list(hist.cpr[min.cutoff:max.cutoff,cpr03]),
+        #list(hist.cpr[min.cutoff:max.cutoff,cpr06]),
+        #list(hist.cpr[min.cutoff:max.cutoff,cpr12]))
   )
 }# sim.trials()
 ```
@@ -1005,8 +1023,21 @@ show.pool.sim.results<-function(sim){
 }# show.pool.sim.results()
 ```
 
-```{r show.qq_f}
-show.qq<-function(sim,title){
+```{r show.norm.stat_f}
+norm.test<-function(dat,title){
+  if(length(dat)>5000){
+    dat<-sample(dat,5000,replace=FALSE)
+  }
+  print(sprintf("%s: length=%d",title,length(dat)))
+  shapiro<-shapiro.test(dat)
+  ks<-ks.test(dat,"pnorm")
+  ad<-ad.test(dat)
+  tab<-data.frame(
+    method=c(shapiro$method,ad$method,)
+  )
+}
+
+show.norm.stat<-function(sim,title){
   par(mfrow=c(1,2))
   qqnorm(sim$cpr01,main=sprintf(title,"1m CPR",sim$loan.count),cex.main=cex.size)
   qqline(sim$cpr01)
@@ -1017,27 +1048,90 @@ show.qq<-function(sim,title){
   qqline(sim$cpr06)
   qqnorm(sim$cpr12,main=sprintf(title,"12m CPR",sim$loan.count),cex.main=cex.size)
   qqline(sim$cpr12)
-}# show.qq()
+  
+   dat<-sim$cpr01
+  if(length(dat)>5000){ # Shapiro-Wilks does not run if n>5000
+    dat<-sample(dat,5000,replace=FALSE)
+  }
+  shapiro01<-shapiro.test(dat)
+  ks01<-ks.test(dat,"pnorm",mean=mean(dat),sd=sd(dat))
+  ad01<-ad.test(dat)
+  
+  dat<-sim$cpr03
+    if(length(dat)>5000){
+    dat<-sample(dat,5000,replace=FALSE)
+  }
+  shapiro03<-shapiro.test(dat)
+  ks03<-ks.test(dat,"pnorm",mean=mean(dat),sd=sd(dat))
+  ad03<-ad.test(dat)
+  
+  dat<-sim$cpr06
+    if(length(dat)>5000){
+    dat<-sample(dat,5000,replace=FALSE)
+  }
+  shapiro06<-shapiro.test(dat)
+  ks06<-ks.test(dat,"pnorm",mean=mean(dat),sd=sd(dat))
+  ad06<-ad.test(dat)
+  
+  dat<-sim$cpr12
+    if(length(dat)>5000){
+    dat<-sample(dat,5000,replace=FALSE)
+  }
+
+  shapiro12<-shapiro.test(dat)
+  ks12<-ks.test(dat,"pnorm",mean=mean(dat),sd=sd(dat))
+  ad12<-ad.test(dat)
+
+  tab<-data.frame(
+    cpr01.stats=c(shapiro01$statistic,shapiro01$p.value,
+                 ks01$statistic,ks01$p.value,
+                 ad01$statistic,ad01$p.value),
+    cpr03.stats=c(shapiro03$statistic,shapiro03$p.value,
+                 ks03$statistic,ks03$p.value,
+                 ad03$statistic,ad03$p.value),
+    cpr06.stats=c(shapiro06$statistic,shapiro06$p.value,
+                 ks06$statistic,ks06$p.value,
+                 ad06$statistic,ad06$p.value),
+    cpr12.stats=c(shapiro12$statistic,shapiro12$p.value,
+                 ks12$statistic,ks12$p.value,
+                 ad12$statistic,ad12$p.value)
+
+ )
+
+  tab<-t(tab)
+  row.names(tab)=c("1m CPR","3m CPR","6m CPR","12m CPR")
+
+  knitr::kable(tab,
+               caption=sprintf(
+                 paste("%d Loans/Pool",
+                       "Shapiro-Wilks (S-W),",
+                       "Kolmogorov-Smirnov (K-S),",
+                       "Anderson-Darling (A-D)",
+                       "tests"),
+                                sim$loan.count),
+        col.name=c("S-W (W)","S-W p-value",
+                   "K-S (D)","K-S p-value",
+                   "A-D (A)","A-D p-value"
+                   ),
+        digits=4
+        ) %>% kable_styling()
+
+}# show.norm.stat()
 ```
 
-```{r small.pool.simulation.trials,results='asis'}
+```{r small.pool.simulation.trials,results='asis',fig.cap='Small Pool Sim.',fig.keep='high'}
 min.cutoff<-1
 max.cutoff<-60 # only include prepay from month 1:max.cutoff
-trials<-1000
+trials<-100
 #
 lc<-100
-cat(sprintf("\n\n## Pools of Loan Count %d\n",lc))
+cat(sprintf("\n\n## %d Loans/Pool Statistics\n",lc))
 set.seed(666) # for unit replicability
 sim<-pool.simulation(trials,min.cutoff,max.cutoff,loan.count=lc)
 title<-sprintf("%d Loan Pool Simulation, %d Trials",sim$loan.count,sim$trials)
 print.time.stats(time=sim$time,title=title)
 show.pool.sim.results(sim=sim)
-show.qq(sim,"%s norm-QQ (%d loans)")
-# possible test for normality
-# qqnorm(sim$cpr12)
-# qqline(sim$cpr12)
-# shapiro.test(sample(sim$cpr12,5000,replace=FALSE))
-# ks.test(sim$cpr12,"pnorm")
+show.norm.stat(sim,"%s norm-QQ (%d loans)")
 ```
 
 ```{r med.pool.simulation.trials,results='asis'}
@@ -1048,11 +1142,19 @@ sim<-pool.simulation(trials,min.cutoff,max.cutoff,loan.count=lc)
 title<-sprintf("%d Loan Pool Simulation, %d Trials",sim$loan.count,sim$trials)
 print.time.stats(time=sim$time,title=title)
 show.pool.sim.results(sim=sim)
-show.qq(sim,"%s norm-QQ (%d loans)")
+show.norm.stat(sim,"%s norm-QQ (%d loans)")
 ```
 
-
-
+```{r medbig.pool.simulation.trials,results='asis'}
+lc<-500
+cat(sprintf("\n\n## Pools of Loan Count %d\n",lc))
+set.seed(666) # for unit replicability
+sim<-pool.simulation(trials,min.cutoff,max.cutoff,loan.count=lc)
+title<-sprintf("%d Loan Pool Simulation, %d Trials",sim$loan.count,sim$trials)
+print.time.stats(time=sim$time,title=title)
+show.pool.sim.results(sim=sim)
+show.norm.stat(sim,"%s norm-QQ (%d loans)")
+```
 
 
 ```{r big.pool.simulation.trials,results='asis'}
@@ -1063,7 +1165,7 @@ sim<-pool.simulation(trials,min.cutoff,max.cutoff,loan.count=lc)
 title<-sprintf("%d Loan Pool Simulation, %d Trials",sim$loan.count,sim$trials)
 print.time.stats(time=sim$time,title=title)
 show.pool.sim.results(sim=sim)
-show.qq(sim,"%s norm-QQ (%d loans)")
+show.norm.stat(sim,"%s norm-QQ (%d loans)")
 ```
 
 
@@ -1164,10 +1266,17 @@ show.qq(sim,"%s norm-QQ (%d loans)")
 ```{r show.pool.sim.results_f,eval=FALSE,echo=TRUE}
 ```
 
+```{r show.norm.stat_f,eval=FALSE,echo=TRUE}
+```
+
+
 ```{r small.pool.simulation.trials,results='asis',eval=FALSE,echo=TRUE}
 ```
 
 ```{r med.pool.simulation.trials,results='asis',eval=FALSE,echo=TRUE}
+```
+
+```{r medbig.pool.simulation.trials,results='asis',eval=FALSE,echo=TRUE}
 ```
 
 ```{r big.pool.simulation.trials,results='asis',eval=FALSE,echo=TRUE}
