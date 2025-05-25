@@ -1,0 +1,13 @@
+% no-float.txt
+% prevents figures in text from floating
+% use with Rmd -> Latex -> pdf
+% https://forum.posit.co/t/cant-control-position-of-tables-and-figures-in-knitted-pdf-document/37364
+
+\usepackage{float}
+\let\origfigure\figure
+\let\endorigfigure\endfigure
+\renewenvironment{figure}[1][2] {
+    \expandafter\origfigure\expandafter[H]
+} {
+    \endorigfigure
+}

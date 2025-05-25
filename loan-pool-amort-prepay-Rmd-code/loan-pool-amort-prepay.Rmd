@@ -3,9 +3,14 @@ title: "Mortgage Loan & Pool Amortization & Prepay Mechanics"
 author: "Rei Shinozuka rei@reishinozuka.com"
 date: "2025-05-16"
 output:
-  pdf_document: default
+  pdf_document: 
+    fig_caption: yes
+    includes:
+      in_header: no-float.tex
+      keep_tex: yes
+      header-includes: 
+        - \usepackage{longtable}
   html_document: default
-  fig_caption: true
 ---
 
 ```{r setup, include=FALSE}
@@ -15,7 +20,8 @@ library(dplyr)
 library(data.table)
 library(kableExtra)
 library(nortest)
-knitr::opts_chunk$set(echo = FALSE,warning=FALSE,fig.width=6,fig.height=2.85,dpi=300)
+knitr::opts_chunk$set(echo = FALSE,warning=FALSE,
+                      fig.pos='H',fig.width=6,fig.height=2.85,dpi=300)
 # global parameters are below
 # as demonstration code, we use global parameters for repeated exemplars
 sched.prin.col<-"paleturquoise3"
@@ -30,8 +36,8 @@ cpr12.col<-"deepskyblue4"
 baseline.cpr.col<-"red"
 cex.size<-0.75
 # final note: as demonstration code, generally we seek a simple sequential flow of control
-# We define functions on where they are truly generalized and are not afraid to duplicate code
-# to illustrate the effect of different loan counts, for example.
+# We define functions on where they are truly generalized and are not afraid to duplicate 
+# code to illustrate the effect of different loan counts, for example.
 ```
 
 ```{r mortgage.parameters}
@@ -49,6 +55,7 @@ orig.bal.str<-prettyNum(orig.bal,big.mark=",", scientific=FALSE)
 
 scalar.cpr.str<-sprintf("%5.2f%%",scalar.cpr*100)
 scalar.smm.str<-sprintf("%5.2f%%",scalar.smm*100)
+complement.smm.str<-sprintf("%5.2f%%",(1-scalar.smm)*100)
 # used to illustrate single loan curtailments
 mo.borrower.pay<-700
 ```
@@ -259,13 +266,14 @@ plot.cfs<-function(cf,title){
   mtext("Age (Mo.)",side=1,line=2.0,cex=cex.size) 
   mtext(paste("Monthly Cashflow",suff.y),side=2,line=4.0,cex=cex.size) 
   mtext(paste("Ending Bal.",suff.y2),side=4,line=4.0,cex=cex.size) 
-  legend(x="bottom", xpd=TRUE,inset = c(0, -0.65),horiz=TRUE,cex=cex.size,
+  legend(x="bottom", xpd=TRUE,inset = c(0, -0.75),horiz=TRUE,cex=cex.size,
          legend=c("Interest","Sched.Prin.","Unsched.Prin.","Ending Balance"),
          lty=c(1,1,1,2),
          col=c(NA,NA,NA,ebal.col),
          fill=c(int.col,sched.prin.col,unsched.prin.col,NA),border=NA,
          bty="n"
          )
+  cat('\n\n')
 } # plot.cfs()
 ```
 
@@ -294,12 +302,13 @@ plot.comp.bals<-function(cf,cf2,title){
 
   mtext("Age (Mo.)",side=1,line=2.0,cex=cex.size) 
   mtext(paste("Ending Bal.",suff.y),side=2,line=4.0,cex=cex.size) 
-  legend(x="bottom", xpd=TRUE,inset = c(0, -0.65),horiz=TRUE,cex=cex.size,
+  legend(x="bottom", xpd=TRUE,inset = c(0, -0.75),horiz=TRUE,cex=cex.size,
          legend=c("Loan Simulation","MBS Convention"),
          lty=c(1,2),
          col=c(ebal.col,ebal2.col),
          bty="n"
          )
+  cat('\n\n')
 } # plot.comp.bals()
 ```
 
@@ -335,12 +344,14 @@ amortization, the balances at the end of each month are referred to as *schedule
 the scheduled payment each month is referred to as the *scheduled principal*.
 The payment window is the term of the loan.
 
-```{r amortization,fig.cap='Scheduled Amortization'}
+```{r amortization}
+#| fig.cap='Scheduled Amortization'
 cpr.eg<-0
 cprsingle<-replicate(orig.term,cpr.eg)
 cfloan<-amort.loan.cf(orig.term,note.rate,orig.bal,cprsingle)
 title<-sprintf("%3.3f%% Loan Scheduled Amortization (%3.1f%% CPR)",note.rate*100,cpr.eg*100)
 plot.cfs(cfloan,title)
+#knitr::knit_exit()
 ```
 
 ### Early Loan Repayment
@@ -352,6 +363,7 @@ resulting in the loan being *paid in full*.
 The below example shows a loan paying in full prior to loan maturity. 
 
 ```{r payment.in.full}
+#| fig.cap='Borrower Repayment prior to Term'
 pif.mon<-354
 cprsingle<-replicate(orig.term,0)
 cprsingle[pif.mon]<-1.0
@@ -378,11 +390,14 @@ The below example shows a loan where the borrower pays a higher monthly amount
 $`r prettyNum(round(mo.borrower.pay,2),  big.mark=",", scientific=FALSE)`
 than the scheduled amount. 
 $`r prettyNum(round(level.pay.calc(orig.term,note.rate/12)*orig.bal,2),  big.mark=",", scientific=FALSE)`.
-The excess payment
-$`r prettyNum(round(mo.borrower.pay-level.pay.calc(orig.term,note.rate/12)*orig.bal,2),  big.mark=",", scientific=FALSE)`.
-is the monthly curtailment, which reduces the remaining balance and brings the final payment to an earlier date.
+The excess amount
+$`r prettyNum(round(mo.borrower.pay-level.pay.calc(orig.term,note.rate/12)*orig.bal,2),  big.mark=",", scientific=FALSE)`
+is the monthly curtailment, which reduces the remaining balance and brings the final payment to an earlier date
+(in this example nearly 10 years.)
+This is the more typical manner in which curtailments occur.
 
 ```{r level.curtailment}
+#| fig.cap='Borrower Rounding-Up Payment (Curtailment)'
 cfloan<-amort.loan.cf(orig.term,note.rate,orig.bal,cpr=c(NA),mo.borrower.pay=mo.borrower.pay)
 title<-sprintf("%3.3f%% Loan Curtailments ($%s monthly payments)",note.rate*100,
                prettyNum(round(mo.borrower.pay,2),big.mark=",", scientific=FALSE))
@@ -391,9 +406,12 @@ plot.cfs(cfloan,title)
 
 The below example shows a loan which curtails monthly as a percent of the scheduled remaining balance.
 This rate annualized is known as *conditional prepayment rate (CPR)*, described more fully in later sections.
-In contrast to the rounded-up monthly example above, the curtailments here decrease with balance.
+In contrast to the rounded-up monthly example above, in this example the rate of curtailment as a percentage
+of scheduled remaining balance is constant, but the *amount* of curtailments here decrease over time
+with balance. 
 
 ```{r curtailment}
+#| fig.cap='Borrower Curtailment as Percentage of Remaining Balance'
 cpr.eg<-0.01
 cprsingle<-replicate(orig.term,cpr.eg)
 cfloan<-amort.loan.cf(orig.term,note.rate,orig.bal,cprsingle)
@@ -414,6 +432,7 @@ When SMM and CPRs are inferred from loan and pool cashflows, these are *historic
 When projecting future cashflows of a pool from a point in time to full paydown, SMMs and CPRs are
 *projected prepayments*. When a quantitative model is used to determine the borrower incentive to prepay from rates and other macroeconomic factors, the SMMs and CPRs are referred to as *model (projected) prepayments*.
 
+Projected prepayments almost always utilize the *MBS convention.*
 The CPR assumption used to project pool cashflows abstracts the mortgage pool into a homogeneous asset 
 which any proportion of remaining balance may be prepaid. This abstraction does not recognize individual loans within the pool. Rather, it assumes the pools consist of a very large number of infinitesimally sized loans. 
 Actual behavior is that individual borrowers decide on a monthly basis to prepay their loans. The 
@@ -421,13 +440,13 @@ convention adopted by MBS investors assumes continuous prepayments to estimate t
 
 To illustrate these distinctions, this section contrasts:
 
-A. Loan Amortization and Prepayment
+  A. Loan Amortization and Prepayment
+  
+  B. Pool Amortization and Prepayment under MBS Convention
+  
+  C. Pool Amortization and Prepayment simulating discrete loans
 
-B. Pool Amortization and Prepayment under MBS Convention
-
-C. Pool Amortization and Prepayment simulating discrete loans
-
-### Parameters
+### Parameters used in Examples
 
 * Original Term = `r orig.term`
 
@@ -469,6 +488,7 @@ Other characteristics of single loan amortization:
     b. do not affect scheduled (level) payment
     
 ```{r amort.loan}
+#| fig.cap='Loan Paydown'
 
 cfloan<-amort.loan.cf(orig.term,note.rate,orig.bal,cpr)
 title<-sprintf("Single %3.3f%% Loan Cashflow %3.1f%% CPR Curtailments",
@@ -520,6 +540,8 @@ CPRs under MBS pool convention is treated as:
   
   
 ```{r amort.pool}
+#| fig.cap='Pool Paydown using MBS Convention'
+
 pool.orig.bal<-orig.bal*loan.count
 cfpool<-amort.pool.cf(orig.term,note.rate,pool.orig.bal,cpr)
 
@@ -533,19 +555,21 @@ plot.cfs(cfpool,title)
 
 The simulation models a pool as an aggregate of a *specific number* of 
 loans of *specific size*. Though not captured in this 
-simulation, loans may have heterogeneous properties (different coupons, sizes, etc).
+simulation example, loans may have heterogeneous properties (different coupons, sizes, etc).
 
 The simulation interprets an SMM as the probability for an individual loan being paid in full each month. There is no provision for curtailment.
 
 #### Example: 
 
-1. Assume flat `r scalar.cpr.str` CPR
+1. The pool consists of `r loan.count` loans each of size `r orig.bal.str`.
 
-2. `r scalar.cpr.str` CPR is annualized equivalent of `r scalar.smm.str` Single Monthly Mortality (SMM).
+2. Assume flat `r scalar.cpr.str` CPR
 
-3. Each month, each loan has a `r scalar.smm.str` probability of paying in full.
+3. `r scalar.cpr.str` CPR is annualized equivalent of `r scalar.smm.str` Single Monthly Mortality (SMM).
 
-4. The scheduled level payment is reduced by the scheduled level payments of those loans paying in full.
+4. Each month, each loan has a `r scalar.smm.str` probability of paying in full and `r complement.smm.str` probability of amortizing.
+
+5. The scheduled level payment is reduced by the scheduled level payments of those loans paying in full.
 
 ```{r simulate.loan.pool_f}
 # simulate.loan.pool(orig.term,note.rate,orig.bal,scalar.cpr,loan.count) ----------------
@@ -648,14 +672,19 @@ simulate.loan.pool.f<-function(orig.term,note.rate,orig.bal,scalar.cpr,loan.coun
 # print.time.stats() =====================================================================
 # helper function to pretty print proc_time object from system.time() call 
 print.time.stats<-function(time,title=NA){
-  knitr::kable(t(time[1:3]),
-               caption=title,
+  cat("\n\n")
+  #knitr::kable(t(time[1:3]),
+   kbl(t(time[1:3]),
+              caption=title, booktabs=T,longtable=T,
                col.names=c("User Time (sec)","System Time (ec)","Elapsed Time (sec)"),
-               format.args=list(width=20)) %>% kable_styling()
+               format.args=list(width=20)) %>% ## kable_styling()
+            kable_paper("striped", full_width = F) # kable_styling()
 }# print.time.stats()
 ```
 
 ```{r pool.simulation}
+#| fig.cap='{Pool Paydown by Simulation'
+
 set.seed(666) # replicable in isolation
 time<-system.time(
   cfsim<-simulate.loan.pool.f(orig.term,note.rate,orig.bal,scalar.cpr,loan.count)
@@ -663,23 +692,29 @@ time<-system.time(
 title<-sprintf("%d Loan Pool Simulation",loan.count)
 print.time.stats(time,title=title)
 ```
-#### Comparing Loan Simulation against MBS Convention
 
-With higher loan counts, the discrete simulation approaches results of the MBS convention.
-
-```{r pool.simulation.comparison}
-title<-sprintf("%3.3f%% Loan Simulation vs MBS Convention, %d Loans %3.1f%% CPR",
-               note.rate*100, loan.count,scalar.cpr*100)
-plot.comp.bals(cfsim,cfpool,title)
-
-```
 
 ```{r pool.simulation.results}
+#| fig.cap='Pool Paydown by Loan Simulation'
 title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",
                 note.rate*100,loan.count,scalar.cpr*100)
 plot.cfs(cfsim,title)
 ```
 
+#### Comparing Loan Simulation against MBS Convention
+
+
+
+With higher loan counts, the discrete simulation approaches results of the MBS convention.
+
+
+```{r pool.simulation.comparison}
+#| fig.cap='Comparing Loan Simulation vs. MBS Convention'
+title<-sprintf("%3.3f%% Loan Simulation vs MBS Convention, %d Loans %3.1f%% CPR",
+               note.rate*100, loan.count,scalar.cpr*100)
+plot.comp.bals(cfsim,cfpool,title)
+
+```
 
 
 
@@ -784,7 +819,7 @@ plot.hist.cpr<-function(cf,title=NA,baseline.cpr=NA){
   mtext("Age (Mo.)",side=1,line=2.0,cex=cex.size) 
   mtext(paste("Prepayment (CPR)"),side=2,line=4.0,cex=cex.size) 
   mtext(paste("Ending Bal.",suff.y2),side=4,line=4.0,cex=cex.size) 
-  legend(x="bottom", xpd=TRUE,inset = c(0, -0.65),horiz=TRUE,cex=cex.size*0.9,
+  legend(x="bottom", xpd=TRUE,inset = c(0, -0.75),horiz=TRUE,cex=cex.size*0.9,
          legend=c("1m CPR (LHS)","3m CPR (LHS)", "6m CPR (LHS)", "12m CPR (LHS)",
                   "End.Bal.(RHS)"),
          lty=c(1,1,1,1,2),
@@ -797,12 +832,14 @@ plot.hist.cpr<-function(cf,title=NA,baseline.cpr=NA){
 
 ## Observed (Historical) Prepayments from Loan and Pool Cashflows
 
-From loan and pool cashflows, calculate observed CPRs from pool balances and
+From loan and pool cashflows, observed CPRs may be calculated from pool balances and
 monthly unscheduled principal prayments.
 The pool loan simulation example will most closely resemble measurement of 
 historical prepayments.
 
 ```{r loan.hist}
+#| fig.cap='Loan Prepayment (Curtailment)'
+#| 
 title<-sprintf("Single %3.3f%% Loan Cashflow %3.1f%% CPR Curtailments",
                note.rate*100,scalar.cpr*100)
 plot.hist.cpr(cfloan,title,baseline.cpr=scalar.cpr)
@@ -810,27 +847,26 @@ plot.hist.cpr(cfloan,title,baseline.cpr=scalar.cpr)
 
 
 ```{r pool.hist}
+#| fig.cap='Pool Prepayment (paydown using MBS Convention)'
+
 title<-sprintf("MBS Convention %3.3f%% Pool Cashflows, %3.1f%% CPR",
                note.rate*100,scalar.cpr*100)
 plot.hist.cpr(cfpool,title,baseline.cpr=scalar.cpr)
 ```
 
 ```{r sim.cpr}
+#| fig.cap='Pool Prepayment (paydown by Loan Simulation)'
+
 title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",
                note.rate*100,loan.count,scalar.cpr*100)
 plot.hist.cpr(cfsim,title,baseline.cpr=scalar.cpr)
 ```
 
+
 #### Loan Count and Pool Paydown
 
-```{r big.pool.simulation}
-set.seed(666) # replicable in isolation
-time<-system.time(
-  big.cfsim<-simulate.loan.pool.f(orig.term,note.rate,orig.bal,scalar.cpr,big.loan.count)
-  )
-title<-sprintf("%d Loan Pool Simulation",big.loan.count)
-print.time.stats(time,title=title)
-```
+Contrast small and large loan count pools paydowns through simulation.
+
 
 ```{r small.pool.simulation}
 set.seed(666) # replicable in isolation
@@ -841,37 +877,60 @@ title<-sprintf("%d Loan Pool Simulation",small.loan.count)
 print.time.stats(time,title=title)
 ```
 
+
+```{r big.pool.simulation}
+set.seed(666) # replicable in isolation
+time<-system.time(
+  big.cfsim<-simulate.loan.pool.f(orig.term,note.rate,orig.bal,scalar.cpr,big.loan.count)
+  )
+title<-sprintf("%d Loan Pool Simulation",big.loan.count)
+print.time.stats(time,title=title)
+```
+
+
 ### Pool Loan Count and Paydowns
+
 
 Examples of small, medium and large pool paydowns are shown below, all modeling
 prepayments at a 
 `r scalar.cpr.str` CPR.
 
+
 ```{r alt.pool.simulation.results}
+#| fig.cap=c('Small Pool Simulation','Medium Pool Simulation','Large Pool Simulation')
+
 title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",
                 note.rate*100,small.loan.count,scalar.cpr*100)
 plot.cfs(small.cfsim,title)
 
+
 title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",
                 note.rate*100,loan.count,scalar.cpr*100)
 plot.cfs(cfsim,title)
+
 
 title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",
                 note.rate*100,big.loan.count,scalar.cpr*100)
 plot.cfs(big.cfsim,title)
 ```
 
+
 CPR derived from the small, medium and large simulations:
 
+
 ```{r alt.sim.cpr}
+#| fig.cap=c('Small Pool Historical CPR','Medium Pool Historical CPR','Large Pool Historical CPR')
+
 title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",
                note.rate*100,small.loan.count,scalar.cpr*100)
 plot.hist.cpr(small.cfsim,title,baseline.cpr=scalar.cpr)
 
+cat('\n\n')
 title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",
                note.rate*100,loan.count,scalar.cpr*100)
 plot.hist.cpr(cfsim,title,baseline.cpr=scalar.cpr)
 
+cat('\n\n')
 title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",
                note.rate*100,big.loan.count,scalar.cpr*100)
 plot.hist.cpr(big.cfsim,title,baseline.cpr=scalar.cpr)
@@ -934,10 +993,11 @@ plot.cpr.dist<-function(cprs,title=NA,desc=NA,lo=NA,hi=NA){
   h$counts<-h$counts/sum(h$counts)
   ymax<-ceiling(max(h$counts)*10)/10
   
-  nudgex=show.max.cpr*1/100*1/2  # 1/2 of 1% of x axis
+  nudgex=show.max.cpr*1/100  # 1% of x axis
   nudgey=ymax*1/100
 
-  plot(h,xlim=c(0,show.max.cpr),xaxt="n",xlab="",yaxt="n",ylim=c(0,ymax),main=title)
+  plot(h,xlim=c(0,show.max.cpr),xaxt="n",xlab="",yaxt="n",ylim=c(0,ymax),
+       main=title,cex.main=cex.size,cex.lab=cex.size)
   abline(v=scalar.cpr,lty=3,lwd=1,col=baseline.cpr.col)
   if(!is.na(lo)){
     abline(v=lo,lty=3,lwd=1,col=baseline.cpr.col)
@@ -955,7 +1015,8 @@ plot.cpr.dist<-function(cprs,title=NA,desc=NA,lo=NA,hi=NA){
   axis(2, at = seq(0,ymax,length.out=5),cex.axis=cex.size,
               sprintf("%3.1f%%",seq(0,ymax,length.out=5)*100),cex.axis=cex.size,las=1)
   mtext(desc,side=1,line=3.0,cex=cex.size) 
-}
+  cat('\n\n')
+}# plot.cpr.dist()
 ```
 
 ```{r run.pool.simulation_f}
@@ -1012,10 +1073,12 @@ show.pool.sim.results<-function(sim){
 
   title<-sprintf("Loan Simulation @ %3.1f%% CPR\n%d loans/pool, %d trials, Months %d-%d",
                  scalar.cpr*100,loan.count,trials,min.cutoff,max.cutoff)
+  par(mfrow=c(1,2))
   plot.cpr.dist(cpr01,title=title,desc="1m Historical CPR",
                 lo=cpr01.q["2.5%"],hi=cpr01.q["97.5%"])
   plot.cpr.dist(cpr03,title=title,desc="3m Historical CPR",
                 lo=cpr03.q["2.5%"],hi=cpr03.q["97.5%"])
+  par(mfrow=c(1,2))
   plot.cpr.dist(cpr06,title=title,desc="6m Historical CPR",
                 lo=cpr06.q["2.5%"],hi=cpr06.q["97.5%"])
   plot.cpr.dist(cpr12,title=title,desc="12m Historical CPR",
@@ -1038,16 +1101,20 @@ norm.test<-function(dat,title){
 }
 
 show.norm.stat<-function(sim,title){
-  par(mfrow=c(1,2))
+  par(mfrow=c(1,4))
   qqnorm(sim$cpr01,main=sprintf(title,"1m CPR",sim$loan.count),cex.main=cex.size)
-  qqline(sim$cpr01)
+  qqline(sim$cpr01,col = "red",lwd=2,lty=2)
+  cat('\n\n')
   qqnorm(sim$cpr03,main=sprintf(title,"3m CPR",sim$loan.count),cex.main=cex.size)
-  qqline(sim$cpr03)
-  par(mfrow=c(1,2))
+  qqline(sim$cpr03,col = "red",lwd=2,lty=2)
+  cat('\n\n')
+  #par(mfrow=c(1,2))
   qqnorm(sim$cpr06,main=sprintf(title,"6m CPR",sim$loan.count),cex.main=cex.size)
-  qqline(sim$cpr06)
+  qqline(sim$cpr06,col = "red",lwd=2,lty=2)
+  cat('\n\n')
   qqnorm(sim$cpr12,main=sprintf(title,"12m CPR",sim$loan.count),cex.main=cex.size)
-  qqline(sim$cpr12)
+  qqline(sim$cpr12,col = "red",lwd=2,lty=2)
+  cat('\n\n')
   
    dat<-sim$cpr01
   if(length(dat)>5000){ # Shapiro-Wilks does not run if n>5000
@@ -1100,8 +1167,12 @@ show.norm.stat<-function(sim,title){
 
   tab<-t(tab)
   row.names(tab)=c("1m CPR","3m CPR","6m CPR","12m CPR")
-
-  knitr::kable(tab,
+  colnames(tab)<-c("sw.stat","sw.pvalue","ks.stat","ks.pvalue","ad.stat","ad.pvalue")
+  data.frame(tab) %>%
+    mutate(sw.pvalue = cell_spec(format.pval(sw.pvalue,3), color = ifelse(sw.pvalue > 0.05, "red","black"))) %>%
+    mutate(ks.pvalue = cell_spec(format.pval(ks.pvalue,3), color = ifelse(ks.pvalue > 0.05, "red","black"))) %>%
+    mutate(ad.pvalue = cell_spec(format.pval(ad.pvalue,3), color = ifelse(ad.pvalue > 0.05, "red","black"))) %>%
+  kbl(escape=FALSE,booktabs = T, longtable=T,
                caption=sprintf(
                  paste("%d Loans/Pool",
                        "Shapiro-Wilks (S-W),",
@@ -1114,18 +1185,20 @@ show.norm.stat<-function(sim,title){
                    "A-D (A)","A-D p-value"
                    ),
         digits=4
-        ) %>% kable_styling()
+        ) %>% kable_paper("striped", full_width = F) # kable_styling()
 
 }# show.norm.stat()
 ```
 
-```{r small.pool.simulation.trials,results='asis',fig.cap='Small Pool Sim.',fig.keep='high'}
+```{r small.pool.simulation.trials,results='asis',fig.keep='high'}
+#| fig.cap=c('Small Pool 1m, 3m CPR','Small Pool 6m, 12m CPR','Small Pool CPR Q-Q')
+
 min.cutoff<-1
 max.cutoff<-60 # only include prepay from month 1:max.cutoff
-trials<-100
+trials<-250
 #
 lc<-100
-cat(sprintf("\n\n## %d Loans/Pool Statistics\n",lc))
+cat(sprintf("\n\n## Small Pool Statistics (%d Loans/Pool)\n",lc))
 set.seed(666) # for unit replicability
 sim<-pool.simulation(trials,min.cutoff,max.cutoff,loan.count=lc)
 title<-sprintf("%d Loan Pool Simulation, %d Trials",sim$loan.count,sim$trials)
@@ -1135,8 +1208,10 @@ show.norm.stat(sim,"%s norm-QQ (%d loans)")
 ```
 
 ```{r med.pool.simulation.trials,results='asis'}
+#| fig.cap=c('Medium Pool 1m, 3m CPR','Medium Pool 6m, 12m CPR','Medium Pool CPR Q-Q')
+
 lc<-250
-cat(sprintf("\n\n## Pools of Loan Count %d\n",lc))
+cat(sprintf("\n\n## Medium Pool Statistics (%d Loans/Pool)\n",lc))
 set.seed(666) # for unit replicability
 sim<-pool.simulation(trials,min.cutoff,max.cutoff,loan.count=lc)
 title<-sprintf("%d Loan Pool Simulation, %d Trials",sim$loan.count,sim$trials)
@@ -1146,8 +1221,10 @@ show.norm.stat(sim,"%s norm-QQ (%d loans)")
 ```
 
 ```{r medbig.pool.simulation.trials,results='asis'}
+#| fig.cap=c('Medium/Large Pool 1m, 3m CPR','Medium/Large Pool 6m, 12m CPR','Medium/Large Pool CPR Q-Q')
+
 lc<-500
-cat(sprintf("\n\n## Pools of Loan Count %d\n",lc))
+cat(sprintf("\n\n## Medium-Large Pool Statistics (%d Loans/Pool)\n",lc))
 set.seed(666) # for unit replicability
 sim<-pool.simulation(trials,min.cutoff,max.cutoff,loan.count=lc)
 title<-sprintf("%d Loan Pool Simulation, %d Trials",sim$loan.count,sim$trials)
@@ -1158,8 +1235,10 @@ show.norm.stat(sim,"%s norm-QQ (%d loans)")
 
 
 ```{r big.pool.simulation.trials,results='asis'}
+#| fig.cap=c('Large Pool 1m, 3m CPR','Large Pool 6m, 12m CPR','Large Pool CPR Q-Q')
+
 lc<-1000
-cat(sprintf("\n\n## Pools of Loan Count %d\n",lc))
+cat(sprintf("\n\n## Large Pool Statistics (%d Loans/Pool)\n",lc))
 set.seed(666) # for unit replicability
 sim<-pool.simulation(trials,min.cutoff,max.cutoff,loan.count=lc)
 title<-sprintf("%d Loan Pool Simulation, %d Trials",sim$loan.count,sim$trials)
