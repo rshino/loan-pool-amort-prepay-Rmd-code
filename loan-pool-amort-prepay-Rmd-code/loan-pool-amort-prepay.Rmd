@@ -333,6 +333,13 @@ https://www.sifma.org/wp-content/uploads/2017/08/chsf.pdf
 
 and denoted *SF1999* in any references below.
 
+Other resources:
+
+https://hughcalc.org/formula.php
+
+https://hughcalc.org/formula_deriv.php
+
+
 ## Basic Loan Amortization Mechanics
 
 ### Loan Amortization 
@@ -343,6 +350,204 @@ with interest comprising the majority of the monthly payment in the early part o
 amortization, the balances at the end of each month are referred to as *scheduled balance*, the principal amount of
 the scheduled payment each month is referred to as the *scheduled principal*.
 The payment window is the term of the loan.
+
+Determining principal, interest and balance at the end of Month 1.
+*B~0~ is the original balance, *m* is the monthly borrower payment,
+*r~m~* is the monthly interest rate, *i~1~* is interest amount in month 1,
+*p~1~* is the principal in month 1 and *B~1~* is the balance at the end of month 1.
+
+$$
+\begin{aligned}
+i_1 & =B_0 r_m\\
+p_1 & =m-B_0 r_m\\
+B_1 & =B_0-(m-B_0 r_m)\\
+   & =B_0+B_0 r_m-m\\
+   & =B_0(1+r_m)-m
+\end{aligned}
+$$
+
+Determining principal, interest and balance at the end of Month 2 
+
+
+$$
+\begin{aligned}
+i_2 & =B_1 r_m\\
+ & =(B_0(1+r_m)-m)r_m\\
+ & =B_0 r_m (1+r_m)-m r_m\\
+p_2 & =m-i_2\\
+  & =m-(B_0 r_m (1+r_m)-m r_m)\\
+  & =m-B_0 r_m (1+r_m)+m r_m\\
+B_2 & =B_0-p_1-p_2\\
+  & =B_0-(m-B_0 r_m)-(m-B_0 r_m (1+r_m)+m r_m)\\
+  & =B_0-m+B_0 r_m-m+B_0 r_m (1+r_m)-m r_m\\
+  & =B_0-m+B_0 r_m-m + B_0 r_m + B_0 r_m^2-m r_m\\
+  & = B_0 r_m^2 + 2 B_0 r_m + B_0-m-m -m r_m\\
+  & = B_0 (r_m^2 + 2 r_m + 1) - m-m r_m - m\\
+  & = B_0 (r_m^2 + 2 r_m + 1) - m (1+r_m) - m\\
+  & = B_0 (1+r_m)^2 - m (1+r_m) - m\\
+\end{aligned}
+$$
+Determining principal, interest and balance at the end of Month 3 
+
+$$
+\begin{aligned}
+i_3 & =B_2 r_m\\
+ & =(B_0 (1+r_m)^2 - m (1+r_m) - m)r_m\\
+p_3 & =m-i_3\\
+  & =m-((B_0 (1+r_m)^2 - m (1+r_m) - m)r_m)\\
+B_3 & =B_0-p_1-p_2-p_3\\
+  & =B_0-(m-B_0 r_m)-(m-B_0 r_m (1+r_m)+m r_m)-(m-((B_0 (1+r_m)^2 - m (1+r_m) - m)r_m))\\
+  & =B_0-m+B_0 r_m-m+B_0 r_m (1+r_m)-m r_m-m+((B_0 (1+r_m)^2 - m (1+r_m) - m)r_m))\\
+  & =B_0-m+B_0 r_m-m+B_0 r_m (1+r_m)-m r_m-m+B_0 r_m (1+r_m)^2 - r_m m (1+r_m) - r_m m\\
+  & =B_0
+  +B_0 r_m
+  +B_0 r_m (1+r_m)
+  +B_0 r_m (1+r_m)^2 
+  -m
+  -m
+  -m r_m
+  -m
+  - r_m m (1+r_m) 
+  - r_m m\\
+    & =B_0
+  +B_0 r_m
+  +B_0 r_m (1+r_m)
+  +B_0 r_m (r_m^2+2 r_m + 1) 
+  -m
+  -m
+  -m r_m
+  -m
+  - r_m m (1+r_m) 
+  - r_m m\\
+      & =B_0
+  +B_0 r_m
+  +B_0 (r_m^2+r_m)
+  +B_0  (r_m^3+2 r_m^2 + r_m) 
+  -m
+  -m
+  -m r_m
+  -m
+  - m (r_m^2+r_m) 
+  - r_m m\\
+      & =B_0 (
+  1
+  +r_m
+  +(r_m^2+r_m)
+  +(r_m^3+2 r_m^2 + r_m) 
+  )
+  -m
+  -m
+  -m r_m
+  -m
+  - m r_m^2-m r_m 
+  - r_m m\\
+  & =B_0 (
+  r_m^3
+   +3 r_m^2 
+ +3 r_m
+    +1
+  )
+  -m
+  -m
+  -m r_m
+  -m
+  - m r_m^2-m r_m 
+  - r_m m\\
+  & =B_0 (
+  r_m^3
+   +3 r_m^2 
+ +3 r_m
+    +1
+  )
+  - m r_m^2
+  -m r_m
+  -m r_m 
+  -m
+  -m
+  - r_m m
+    -m\\
+  & =B_0 (
+  r_m^3
+   +3 r_m^2 
+ +3 r_m
+    +1
+  )
+  - m (r_m^2
+  + 2 r_m
+  +1)
+  -m (
+   r_m + 1
+  )
+    -m\\
+  & =B_0 (1+ r_m)^3
+  - m (1+r_m)^2
+  -m (
+   1+r_m 
+  )
+    -m\\
+\end{aligned}
+$$
+
+At the end of month 360, we have:
+
+$$
+\begin{aligned}
+ B_{360} & =B_0 (1+ r_m)^{360}
+  - m (1+r_m)^{359}
+  - m (1+r_m)^{358}
+  ...
+    -m\\
+\end{aligned}
+$$
+To derive *m*, we observe that terms with *m* as coefficient represent a geometric series, which is nominally specified:
+
+
+$$
+\begin{aligned}
+S_n = a r^0 + a r^1 + ... +a r^n = \sum_{i=0}^n a r^k
+\end{aligned}
+$$
+The closed form solution for a geometric series is:
+$$
+\begin{aligned}
+S_n = a (\frac{1-r^{n+1}}{1-r})
+\end{aligned}
+$$
+Substituting loan variables:
+
+$$
+\begin{aligned}
+S_n = m (\frac{1-(1+r_m)^{n+1}}{1-(1+r_m)})
+\end{aligned}
+$$
+Replacing the 2nd to nth terms:
+
+$$
+\begin{aligned}
+B_{360} & =B_0 (1+ r_m)^{360} -  S_{359}\\
+B_{360} & =B_0 (1+ r_m)^{360} -  m (\frac{1-(1+r_m)^{360}}{1-(1+r_m)})\\
+\end{aligned}
+$$
+
+The final balance B~360~ is zero, allowing us to isolate *m*:
+
+$$
+\begin{aligned}
+0 & =B_0 (1+ r_m)^{360} -  m (\frac{1-(1+r_m)^{360}}{1-(1+r_m)})\\
+0 & =B_0 (1+ r_m)^{360} -  m (\frac{1-(1+r_m)^{360}}{1-(1+r_m)})\\
+m (\frac{1-(1+r_m)^{360}}{1-(1+r_m)}) & =B_0 (1+ r_m)^{360} \\
+m & =B_0 (1+ r_m)^{360} (\frac{1-(1+r_m)}{1-(1+r_m)^{360}}) \\
+m & =B_0 (1+ r_m)^{360} (\frac{r_m}{(1+r_m)^{360}-1}) \\
+m & =B_0 r_m \frac {(1+ r_m)^{360}}{(1+r_m)^{360}-1} \\
+m & =B_0 \frac{r_m}{1-(1+r_m)^{-360}} 
+\end{aligned}
+$$
+
+
+```{r early_exit}
+knitr::knit_exit()
+```
+
 
 ```{r amortization}
 #| fig.cap='Scheduled Amortization'
