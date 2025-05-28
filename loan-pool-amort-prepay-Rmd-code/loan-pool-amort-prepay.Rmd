@@ -1,9 +1,10 @@
 ---
 title: "Mortgage Loan & Pool Amortization & Prepay Mechanics"
 author: "Rei Shinozuka rei@reishinozuka.com"
-date: "2025-05-16"
+date: "2025-05-28"
 output:
   pdf_document: 
+    number_sections: yes
     fig_caption: yes
     includes:
       in_header: no-float.tex
@@ -22,6 +23,7 @@ library(kableExtra)
 library(nortest)
 knitr::opts_chunk$set(echo = FALSE,warning=FALSE,
                       fig.pos='H',fig.width=6,fig.height=2.85,dpi=300)
+bail<-TRUE
 # global parameters are below
 # as demonstration code, we use global parameters for repeated exemplars
 sched.prin.col<-"paleturquoise3"
@@ -50,7 +52,8 @@ scalar.cpr<-0.06    # flat CPR, e.g., 0.06 == 6% conditional prepay rate which i
 cpr<-replicate(orig.term,scalar.cpr)
 # parameter string equivalents to basic parameters
 scalar.smm<-1-(1-scalar.cpr)^(1/12)
-note.rate.str<-sprintf("%5.2f%%",note.rate*100)
+note.rate.str<-sprintf("%5.3f%%",note.rate*100)
+monthly.rate.str<-sprintf("%6.4f%%",note.rate/12*100)
 orig.bal.str<-prettyNum(orig.bal,big.mark=",", scientific=FALSE)
 
 scalar.cpr.str<-sprintf("%5.2f%%",scalar.cpr*100)
@@ -64,6 +67,7 @@ mo.borrower.pay<-700
 loan.count<-250
 small.loan.count<-100
 big.loan.count<-1000
+yuge.loan.count<-10*1000
 ```
 
 ```{r level.pay.calc_f}
@@ -312,9 +316,9 @@ plot.comp.bals<-function(cf,cf2,title){
 } # plot.comp.bals()
 ```
 
-# Part I. Amortization and Prepayment Mechanics for Fixed-Rate Level-Pay Mortgages
+# Amortization and Prepayment Mechanics for Fixed-Rate Level-Pay Mortgages
 
-## Description and Definitions
+## Scope and Definitions
 
 Fixed-Rate Level-Pay mortgages comprise the great majority of loans originated in the US.
 
@@ -333,12 +337,18 @@ https://www.sifma.org/wp-content/uploads/2017/08/chsf.pdf
 
 and denoted *SF1999* in any references below.
 
-Other resources:
+Other resources on mortgage amortization:
 
 https://hughcalc.org/formula.php
 
 https://hughcalc.org/formula_deriv.php
 
+The equation notation used in this document will not exactly correspond to the 
+sources but is generally consistent with the sources.
+^[In the equation exhibits, a 6% note rate would generally be represented as 0.06 or as a monthly rate of 0.005, a 12% CPR would be 0.12, etc.
+This avoids the proliferation of the constants 100 and 1200 found in the source material.
+The R code follows this convention.
+]
 
 ## Basic Loan Amortization Mechanics
 
@@ -351,8 +361,23 @@ amortization, the balances at the end of each month are referred to as *schedule
 the scheduled payment each month is referred to as the *scheduled principal*.
 The payment window is the term of the loan.
 
+Each month the borrower remits the scheduled monthly payment *m*, comprising of interest *i~i~* and principal *p~i~*, the reduction of principal resulting in a monthly
+ending balance *B~i~*.
+
+$$
+\begin{aligned}
+m & = i_i + p_i \\
+i_i & =B_{i-1} r_m\\
+p_i & =m-B_{i-1} r_m\\
+B_i & =B_{i-1}-p_1\\
+   & =B_{i-1}-(m-B_0 r_m)\\
+   & =B_{i-1}+B_{i-1} r_m-m\\
+   & =B_{i-1}(1+r_m)-m
+\end{aligned}
+$$
+
 Determining principal, interest and balance at the end of Month 1.
-*B~0~ is the original balance, *m* is the monthly borrower payment,
+*B~0~* is the original balance, *m* is the monthly borrower payment,
 *r~m~* is the monthly interest rate, *i~1~* is interest amount in month 1,
 *p~1~* is the principal in month 1 and *B~1~* is the balance at the end of month 1.
 
@@ -360,7 +385,8 @@ $$
 \begin{aligned}
 i_1 & =B_0 r_m\\
 p_1 & =m-B_0 r_m\\
-B_1 & =B_0-(m-B_0 r_m)\\
+B_1 & =B_0-p_1\\
+   & =B_0-(m-B_0 r_m)\\
    & =B_0+B_0 r_m-m\\
    & =B_0(1+r_m)-m
 \end{aligned}
@@ -488,7 +514,7 @@ B_3 & =B_0-p_1-p_2-p_3\\
 \end{aligned}
 $$
 
-At the end of month 360, we have:
+At the end of month 360 (for 30 year loan), we have:
 
 $$
 \begin{aligned}
@@ -497,35 +523,49 @@ $$
   - m (1+r_m)^{358}
   ...
     -m\\
+ & =B_0 (1+ r_m)^{360}
+  - \left[ 
+  m (1+r_m)^{359}
+  + m (1+r_m)^{358}
+  ...
+  +m \right]
 \end{aligned}
 $$
-To derive *m*, we observe that terms with *m* as coefficient represent a geometric series, which is nominally specified:
+To derive *m*,  observe that *m* coefficient terms
+represent a geometric series, which is nominally specified:
 
 
 $$
 \begin{aligned}
-S_n = a r^0 + a r^1 + ... +a r^n = \sum_{i=0}^n a r^k
+S_n = a r^0 + a r^1 + ... +a r^n = \sum_{k=0}^n a r^k
 \end{aligned}
 $$
 The closed form solution for a geometric series is:
+
 $$
 \begin{aligned}
-S_n = a (\frac{1-r^{n+1}}{1-r})
+S_n = 
+\begin{cases}
+a (n+1) & r=1 \\
+a \left(\frac{1-r^{n+1}}{1-r}\right) & r\ne1
+\end{cases}
 \end{aligned}
 $$
 Substituting loan variables:
 
 $$
 \begin{aligned}
-S_n = m (\frac{1-(1+r_m)^{n+1}}{1-(1+r_m)})
+r_m & \ne 0\\
+S_n &= m \left(\frac{1-(1+r_m)^{n+1}}{1-(1+r_m)}\right)
 \end{aligned}
 $$
-Replacing the 2nd to nth terms:
+Replacing the 2nd to nth terms in the partial sum:
 
 $$
 \begin{aligned}
+r_m & \ne 0\\
 B_{360} & =B_0 (1+ r_m)^{360} -  S_{359}\\
-B_{360} & =B_0 (1+ r_m)^{360} -  m (\frac{1-(1+r_m)^{360}}{1-(1+r_m)})\\
+B_{360} & =B_0 (1+ r_m)^{360} -  m \left(\frac{1-(1+r_m)^{360}}{1-(1+r_m)}\right)\\
 \end{aligned}
 $$
 
@@ -533,20 +573,25 @@ The final balance B~360~ is zero, allowing us to isolate *m*:
 
 $$
 \begin{aligned}
-0 & =B_0 (1+ r_m)^{360} -  m (\frac{1-(1+r_m)^{360}}{1-(1+r_m)})\\
-0 & =B_0 (1+ r_m)^{360} -  m (\frac{1-(1+r_m)^{360}}{1-(1+r_m)})\\
-m (\frac{1-(1+r_m)^{360}}{1-(1+r_m)}) & =B_0 (1+ r_m)^{360} \\
-m & =B_0 (1+ r_m)^{360} (\frac{1-(1+r_m)}{1-(1+r_m)^{360}}) \\
-m & =B_0 (1+ r_m)^{360} (\frac{r_m}{(1+r_m)^{360}-1}) \\
-m & =B_0 r_m \frac {(1+ r_m)^{360}}{(1+r_m)^{360}-1} \\
-m & =B_0 \frac{r_m}{1-(1+r_m)^{-360}} 
+0 & =B_0 (1+ r_m)^{360} -  m \left(\frac{1-(1+r_m)^{360}}{1-(1+r_m)}\right)\\
+m \left(\frac{1-(1+r_m)^{360}}{1-(1+r_m)}\right) & =B_0 (1+ r_m)^{360} \\
+m & =B_0 (1+ r_m)^{360} \left(\frac{1-(1+r_m)}{1-(1+r_m)^{360}}\right) \\
+ & =B_0 (1+ r_m)^{360} \left(\frac{r_m}{(1+r_m)^{360}-1}\right) \\
+ & =B_0 r_m \frac {(1+ r_m)^{360}}{(1+r_m)^{360}-1} \\
+ & =B_0 \frac{r_m}{1-(1+r_m)^{-360}} 
 \end{aligned}
 $$
+For the corner case  r~m~ = 0, we substitute
 
 
-```{r early_exit}
-knitr::knit_exit()
-```
+$$
+\begin{aligned}
+r_m &= 0 \\
+0 & =B_0 (1+ r_m)^{360} -  S_{359}\\
+0 & =B_0 -  m 360\\
+m &=\frac{B_0}{360}
+\end{aligned}
+$$
 
 
 ```{r amortization}
@@ -557,7 +602,37 @@ cfloan<-amort.loan.cf(orig.term,note.rate,orig.bal,cprsingle)
 title<-sprintf("%3.3f%% Loan Scheduled Amortization (%3.1f%% CPR)",note.rate*100,cpr.eg*100)
 plot.cfs(cfloan,title)
 #knitr::knit_exit()
+# m & =`r orig.bal.str` \frac{`r monthly.rate.str`}{1-(1+`r monthly.note.str`)^{-360}} 
+
 ```
+
+
+Monthly payment is:
+
+$$
+\begin{aligned}
+m & =B_0 \frac{r_m}{1-(1+r_m)^{-360}} \\
+ & =`r orig.bal.str` \frac{`r note.rate/12`}{1-(1+`r note.rate/12`)^{-360}} \\
+ & =`r round(orig.bal*(note.rate/12)/(1-(1+note.rate/12)^(-360)),2)` 
+\end{aligned}
+$$
+First month: 
+
+
+$$
+\begin{aligned}
+r_m & = `r note.rate/12` \\
+B_0 & =`r orig.bal.str` \\
+i_1 & =`r orig.bal*note.rate/12` \\
+p_1 & =`r round(orig.bal*(note.rate/12)/(1-(1+note.rate/12)^(-360))-orig.bal*note.rate/12,2)` \\
+B_1 & =`r prettyNum(
+  round(
+    orig.bal-(orig.bal*(note.rate/12)/(1-(1+note.rate/12)^(-360))-orig.bal*note.rate/12),2
+    ),big.mark=",")`
+\end{aligned}
+$$
+
+
 
 ### Early Loan Repayment
 
@@ -587,6 +662,24 @@ to simplify book keeping or to shorten the loan term.
 Both payments-in-full and curtailments are types of *prepayments*,
 also known as *unscheduled principal* payments.
 
+We extend the cash flow model to accommodate prepayments.
+The borrower has the same scheduled monthly payment *m*, comprising of interest *i~i~* and principal *p~S,i~*. The *S* in the subscript denotes *scheduled* principal.
+The borrower may also remit additional principal up to the loan remaining balance, which 
+we denote *p~U,i~* for *unscheduled* principal. 
+We differentiate *scheduled* balance *B~U,i~* as the ending balance after amortizing with scheduled principal *p~S,i~* and *actual* balance *B~A,i~* as the ending balance after scheduled and unscheduled principal.
+
+$$
+\begin{aligned}
+m & = i_i + p_{U,i} \\
+i_i & =B_{A,i-1} r_m\\
+p_{S,i} & =m-B_{A,i-1} r_m\\
+B_{S,i} & =B_{A.i-1}-p_{S,i}\\
+   & =B_{A.i-1}-(m-B_0 r_m)\\
+   & =B_{A,i-1}+B_{A,i-1} r_m-m\\
+   & =B_{A,i-1}(1+r_m)-m\\
+B_{A,i} & =B_{A.i-1}-p_{S,i}-p_{U,i}\\
+\end{aligned}
+$$
 Curtailments do not change the scheduled payment (interest plus scheduled principal). 
 The curtailments accelerate the paydown of remaining loan balance and hence reduce the duration of the payment window.
 The total interest paid is also reduced.
@@ -610,7 +703,36 @@ plot.cfs(cfloan,title)
 ```
 
 The below example shows a loan which curtails monthly as a percent of the scheduled remaining balance.
-This rate annualized is known as *conditional prepayment rate (CPR)*, described more fully in later sections.
+This rate annualized is known as *conditional prepayment rate (CPR)*.
+It is based on the *Single Monthly Mortality (SMM)* which captures prepayments as a
+proportion to the ending scheduled balance for a given month. Conversely, a 
+model might estimate a loan or pool's incentive to prepay and express this as an SMM
+from which unscheduled principal is calculated.
+
+$$
+\begin{aligned}
+SMM_i &= \frac{p_{U,i}}{B_{S,i}}\\
+p_{U,i} &= B_{S,i} SMM_i \\
+\end{aligned}
+$$
+As mentioned earlier CPR is the annualized measure of SMM:
+
+$$
+\begin{aligned}
+CPR &= 1-(1-SMM)^{12} \\
+SMM &= 1-\sqrt[12]{1-CPR}
+\end{aligned}
+$$
+
+$$
+\begin{aligned}
+B_{A,i} & =B_{A.i-1}-p_{S,i}-p_{U,i}\\
+ & =B_{S.i}- B_{S,i} SMM_i\\
+   & =B_{S.i}(1-SMM_i)
+\end{aligned}
+$$
+
+
 In contrast to the rounded-up monthly example above, in this example the rate of curtailment as a percentage
 of scheduled remaining balance is constant, but the *amount* of curtailments here decrease over time
 with balance. 
@@ -624,9 +746,9 @@ title<-sprintf("%3.3f%% Loan Curtailments (at %3.1f%% CPR)",note.rate*100,cpr.eg
 plot.cfs(cfloan,title)
 ```
 
-## Differences Modeling Cashflows and Prepayments of Loans and Pools
+## Loan Cashflows versus Pool Cashflows
 
-The growth of Mortgage-Based Securities (MBS) in the 1980s led to investors to evaluate mortgage loans as 
+The growth of Mortgage-Based Securities (MBS) in the 1980s led investors to evaluate mortgage loans as bonds collateralized by
 pools of loans. The borrower's option to refinance the loan is to the investor a short call option. Reflecting this exposure, MBS investor reporting attempts to describe historical prepayments and investor analysis
 requires assumptions to project future prepayments. 
 
@@ -639,59 +761,63 @@ When projecting future cashflows of a pool from a point in time to full paydown,
 
 Projected prepayments almost always utilize the *MBS convention.*
 The CPR assumption used to project pool cashflows abstracts the mortgage pool into a homogeneous asset 
-which any proportion of remaining balance may be prepaid. This abstraction does not recognize individual loans within the pool. Rather, it assumes the pools consist of a very large number of infinitesimally sized loans. 
-Actual behavior is that individual borrowers decide on a monthly basis to prepay their loans. The 
-convention adopted by MBS investors assumes continuous prepayments to estimate the discrete behavior of actual loan pools. The difference between the continuous and discrete view is minimized when pools consist of the large number of loans (>250 loan count) typically required for MBS securitization.
+which any proportion of remaining balance may be prepaid. This abstraction does not recognize individual loans within the pool. Rather, it assumes the pools 
+are infinitely divisible, or more practically
+consist of a very large number of infinitesimally sized loans. 
+Actual behavior is that individual borrowers decide on a monthly basis to prepay their loans based on a rate incentive utility function, or exogenous events leading to housing turnover.
+The convention adopted by MBS investors is that pool prepayments are continuous 
+functions which can approximate the discrete loan behavior of actual loan pools. 
+The difference between the continuous and discrete view is minimized when pools consist of the large number of loans (>500 loan count) typically required for MBS securitization.
 
 To illustrate these distinctions, this section contrasts:
 
-  A. Loan Amortization and Prepayment
+  * Loan Amortization and Prepayment
   
-  B. Pool Amortization and Prepayment under MBS Convention
+  * MBS Convention for Pool Amortization and Prepayment
   
-  C. Pool Amortization and Prepayment simulating discrete loans
+  * Loan Simulation for Pool Amortization and Prepayment
 
 ### Parameters used in Examples
 
-* Original Term = `r orig.term`
+  * Original Term = `r orig.term`
+  
+  * Note rate = `r note.rate.str`
+  
+  * Original Loan Balance = `r orig.bal.str`
+  
+  * Monthly payment = `r prettyNum(round(level.pay.calc(orig.term,note.rate/12)*orig.bal,2),
+    big.mark=",", scientific=FALSE)`
+  
+  * Conditional Prepayment Rate (CPR) = `r scalar.cpr.str`
+  
+  * Pool Loan Count = `r loan.count`
 
-* Note rate = `r note.rate.str`
-
-* Original Loan Balance = `r orig.bal.str`
-
-* Monthly payment = `r prettyNum(round(level.pay.calc(orig.term,note.rate/12)*orig.bal,2),
-  big.mark=",", scientific=FALSE)`
-
-* Conditional Prepayment Rate (CPR) = `r scalar.cpr.str`
-
-* Pool Loan Count = `r loan.count`
-
-### A. Loan Amortization and Prepayment
+### Loan Amortization and Prepayment
 
 The single loan is modeled following its contractual terms.
 
 CPRs for single loans are treated as: 
 
-1. Scheduled amortization (CPR == 0%)
-
-2. Curtailments (0% < CPR < 100%) or 
-
-3. Payments in full (CPR == 100%)
+  1. Scheduled amortization (CPR == 0%)
+  
+  2. Curtailments (0% < CPR < 100%) or 
+  
+  3. Payments in full (CPR == 100%)
 
 Other characteristics of single loan amortization:
 
-1. the Scheduled Payment does not change
+  1. the Scheduled Payment does not change
+  
+  2. Coupon does not change over time
+  
+  3. Age and Remaining Term increment by 1 and -1 respectively every month
+  
+  4. Nonzero CPR < 100% represents curtailments, which 
 
-2. Coupon does not change over time
+      a. reduce the payment window by accelerating the final paydown to zero
+      
+      b. do not affect scheduled (level) payment
 
-3. Age and Remaining Term increment by 1 and -1 respectively every month
-
-4. Nonzero CPR < 100% represents curtailments, which 
-
-    a. reduce the payment window by accelerating the final paydown to zero
-    
-    b. do not affect scheduled (level) payment
-    
 ```{r amort.loan}
 #| fig.cap='Loan Paydown'
 
@@ -702,14 +828,28 @@ plot.cfs(cfloan,title)
 ```
 
 
-### B. Pool Amortization and Prepayment under MBS Convention
+### MBS Convention for Pool Amortization and Prepayment
+
 
 The MBS convention assumes prepayments are *continuous*, 
 implying pools consist of infinite number of loans each of *infinitesimal size*. 
-There is no explicit modeling of loans and loan counts, though the latter may be inferred if average loan size is an attribute of the pool.
+There is no modeling of loans and loan counts 
+^[Loan count may be inferred if average loan size is an attribute of the pool, however any such inferred loan count would be ignored in processing prepayments.]
+Balances and other metrics represent the aggregated values 
+of loans constituting the original pool. 
 
-Balances and other quantities represent the aggregated values 
-of pseudo-loans comprising the pool. 
+*SF1999* explicitly describes a pool factor $\frac{current face}{original face}$ as:
+
+$$
+\begin{aligned}
+\operatorname{POOL FACTOR} &= \operatorname{SURVIVAL\ \ FACTOR} 
+\times
+\operatorname{AMORTIZED\ \ LOAN\ \ BALANCE}
+\end{aligned}
+$$
+which compartmentalizes prepayments and amortization. The pool amortizes as 
+a very large loan and prepayments, and prepayments reduce the survival factor
+directly.
 
 CPRs under MBS pool convention is treated as: 
 
@@ -717,7 +857,8 @@ CPRs under MBS pool convention is treated as:
 
 2. scheduled amortization (CPR == 0%)
 
-3. There is no provision for curtailment.
+3. There is no accommodation for curtailment 
+^[The MBS Convention interprets pool prepayments as full loan repayments, not partial repayments. The timing of cashflows cannot change.]
 
 #### Example: 
 
@@ -729,19 +870,19 @@ CPRs under MBS pool convention is treated as:
 
 4. The scheduled level payment is also reduced by `r scalar.smm.str` reflecting the paydowns.
 
-#### Other characteristics of the pool:
+#### MBS Convention pool paydown characteristics:
 
-1. the scheduled payment changes
+1. the pool scheduled monthly payment is reduced after every prepayment
 
-2. coupon does not change over time
+2. the coupon and pool aggregate measures are invariant over time and prepayments
 
-3. age and remaining term increment by 1 and -1 respectively every month
+3. age and remaining term increment by exactly 1 and -1 respectively every month
 
     a. age represents Weighted Average Loan Age (WALA)
     
     b. remaining term represents Weighted Average Maturity (WAM)
   
-4. Prepayments do not affect the payment window
+4. Pools extend to their stated maturity; prepayments do not affect the payment window
   
   
 ```{r amort.pool}
@@ -756,13 +897,15 @@ plot.cfs(cfpool,title)
 
 ```
 
-### C. Pool Amortization and Prepayment simulating discrete loans
+### Loan Simulation for Pool Amortization and Prepayment
 
-The simulation models a pool as an aggregate of a *specific number* of 
-loans of *specific size*. Though not captured in this 
-simulation example, loans may have heterogeneous properties (different coupons, sizes, etc).
+Loan simulation models a pool as the aggregate of a *specific number* of 
+loans of *specific size*. 
+^[Though not captured in this 
+simulation example, loans may possess heterogeneous properties (different coupons, sizes, etc.) would would permit characteristics of the pool to change over time and prepayments, e.g., WAC drift)].
 
-The simulation interprets an SMM as the probability for an individual loan being paid in full each month. There is no provision for curtailment.
+The simulation interprets an SMM as the probability for an individual loan being paid in full each month. In this implementation there is no provision made for curtailment.
+^[Individual loans could in fact curtail in simulation, if a curtailment function were defined, distinct and separate from the prepayment function. ]
 
 #### Example: 
 
@@ -908,9 +1051,7 @@ plot.cfs(cfsim,title)
 
 #### Comparing Loan Simulation against MBS Convention
 
-
-
-With higher loan counts, the discrete simulation approaches results of the MBS convention.
+With higher loan counts, loan simulation approaches results of the MBS convention.
 
 
 ```{r pool.simulation.comparison}
@@ -1035,12 +1176,60 @@ plot.hist.cpr<-function(cf,title=NA,baseline.cpr=NA){
 } # plot.hist.cpr()
 ```
 
-## Observed (Historical) Prepayments from Loan and Pool Cashflows
+# Deriving Observed (Historical) Prepayments from Loan and Pool Cashflows
 
-From loan and pool cashflows, observed CPRs may be calculated from pool balances and
-monthly unscheduled principal prayments.
-The pool loan simulation example will most closely resemble measurement of 
-historical prepayments.
+Given the loan and pool monthly balances and unscheduled principal payments, 
+we reverse the process to
+infer prepayments as SMM values, annualized as CPRs.
+As shown earlier:
+
+$$
+\begin{aligned}
+SMM_i &= \frac{p_{U,i}}{B_{S,i}}\\
+\end{aligned}
+$$
+In deriving prepayment, we would typically be provided actual rather than scheduled balances, so we rewrite as:
+
+$$
+\begin{aligned}
+SMM_i &= \frac{p_{U,i}}{B_{A,i}+p_{U,i}}\\
+\end{aligned}
+$$
+The variables for SMM~i~ and CPR~i~ used to this point have a term of 1 month; i.e., 
+they capture 1 month of prepayments from month *i-1* to *i*. As we'll see, the 1 month prepayment 
+tends to be volatile when inferring from historical or simulated loan data.
+For this reason, it is common to measure prepayment
+terms of 3-, 6- and 12 months.
+^[Terms longer than 12 months are sometimes reported, such as Since-Issue CPR representing the constant CPR which applied to the pool from origination to today would calculate a balance equaling today's balance.]
+
+For example, a 3m SMM at time *i* 
+would capture unscheduled principal from month *i-3* to month *i*
+or *p~U,i-2~* + *p~U,i-1~* + *p~U,i~*.
+The 3 month scheduled balance
+^[*scheduled balance* gains an additional backward-looking dimension.
+Today's pool scheduled balance (1 month)
+reflects amortization from last month's actual balance, but today's 3 month scheduled 
+balance reflects amortization from the actual balance 3 months ago.]
+at month *i* 
+would be *B~A,i* + *p~U,i-2~* + *p~U,i-1~* + *p~U,i~*.
+This can be written
+
+$$
+\begin{aligned}
+SMM_{3,i} &= \sqrt[3]{\frac{\sum_{k=i-2}^{i}p_{U,k}}{B_{A,i}+\sum_{k=i-2}^{i}p_{U,k}}}\\
+\end{aligned}
+$$
+The 12-month measure captures a full year is free from 
+seasonal variation.
+
+$$
+\begin{aligned}
+SMM_{12,i} &= \sqrt[12]{\frac{\sum_{k=i-11}^{i}p_{U,k}}{B_{A,i}+\sum_{k=i-11}^{i}p_{U,k}}}\\
+\end{aligned}
+$$
+The term SMM measures are geometric averages expressed as 1-month equivalents, and can be converted to corresponding term CPR in the usual way.
+
+The observed CPR for a loan shows either payment-in-full (100 CPR) or monthly curtailment.
 
 ```{r loan.hist}
 #| fig.cap='Loan Prepayment (Curtailment)'
@@ -1050,17 +1239,27 @@ title<-sprintf("Single %3.3f%% Loan Cashflow %3.1f%% CPR Curtailments",
 plot.hist.cpr(cfloan,title,baseline.cpr=scalar.cpr)
 ```
 
+The observed CPR for an MBS convention pool will return the prepayment vector used 
+to pay down the pool.
 
 ```{r pool.hist}
-#| fig.cap='Pool Prepayment (paydown using MBS Convention)'
+#| fig.cap='MBS Convention Pool Prepayment'
 
 title<-sprintf("MBS Convention %3.3f%% Pool Cashflows, %3.1f%% CPR",
                note.rate*100,scalar.cpr*100)
 plot.hist.cpr(cfpool,title,baseline.cpr=scalar.cpr)
 ```
 
+The loan simulation case will most closely highlight measurement of 
+historical prepayments.
+Here the observed CPR will reflect the paydowns of individual loans in the pool, 
+and will evince the largely discrete characteristic of prepayments. 
+The 12-month CPR is significantly more stable than the shorter term measures, as 
+will be quantified in a later section.
+
+
 ```{r sim.cpr}
-#| fig.cap='Pool Prepayment (paydown by Loan Simulation)'
+#| fig.cap='Loan Simulation Pool Prepayment'
 
 title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",
                note.rate*100,loan.count,scalar.cpr*100)
@@ -1068,7 +1267,10 @@ plot.hist.cpr(cfsim,title,baseline.cpr=scalar.cpr)
 ```
 
 
-#### Loan Count and Pool Paydown
+
+
+### Loan Count and Pool Paydown
+
 
 Contrast small and large loan count pools paydowns through simulation.
 
@@ -1141,7 +1343,8 @@ title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",
 plot.hist.cpr(big.cfsim,title,baseline.cpr=scalar.cpr)
 ```
 
-# Part II. Simulation of Loan Pool Prepayments
+
+# Simulation of Loan Pool Prepayments
 
 Example C in the prior section showed single simulation of a pool of mortgage loans.
 
@@ -1166,6 +1369,13 @@ We describe simulated data:
 
 In the statistical tests the null hypothesis H0 is that the data is normal. A p-value less than the significance threshold (0.01, 0.05) indicates 
 evidence that H0 (normality) is not true.
+
+```{r early_exit}
+if(bail)
+{
+  knitr::knit_exit()
+}
+```
 
 ```{r sim.trials_f}
 # sim.trials(min.cutoff,max.cutoff,loan.count) ===========================================
@@ -1451,6 +1661,241 @@ print.time.stats(time=sim$time,title=title)
 show.pool.sim.results(sim=sim)
 show.norm.stat(sim,"%s norm-QQ (%d loans)")
 ```
+
+# Appendix: Formulae
+
+
+Each month the borrower remits the scheduled monthly payment *m*, comprising of interest *i~i~* and principal *p~i~*, the reduction of principal resulting in a monthly
+ending balance *B~i~*.
+
+$$
+\begin{aligned}
+m & = i_i + p_i \\
+i_i & =B_{i-1} r_m\\
+p_i & =m-B_{i-1} r_m\\
+B_i & =B_{i-1}-p_1\\
+   & =B_{i-1}-(m-B_0 r_m)\\
+   & =B_{i-1}+B_{i-1} r_m-m\\
+   & =B_{i-1}(1+r_m)-m
+\end{aligned}
+$$
+
+Determining principal, interest and balance at the end of Month 1.
+*B~0~* is the original balance, *m* is the monthly borrower payment,
+*r~m~* is the monthly interest rate, *i~1~* is interest amount in month 1,
+*p~1~* is the principal in month 1 and *B~1~* is the balance at the end of month 1.
+
+$$
+\begin{aligned}
+i_1 & =B_0 r_m\\
+p_1 & =m-B_0 r_m\\
+B_1 & =B_0-p_1\\
+   & =B_0-(m-B_0 r_m)\\
+   & =B_0+B_0 r_m-m\\
+   & =B_0(1+r_m)-m
+\end{aligned}
+$$
+
+Determining principal, interest and balance at the end of Month 2 
+
+
+$$
+\begin{aligned}
+i_2 & =B_1 r_m\\
+ & =(B_0(1+r_m)-m)r_m\\
+ & =B_0 r_m (1+r_m)-m r_m\\
+p_2 & =m-i_2\\
+  & =m-(B_0 r_m (1+r_m)-m r_m)\\
+  & =m-B_0 r_m (1+r_m)+m r_m\\
+B_2 & =B_0-p_1-p_2\\
+  & =B_0-(m-B_0 r_m)-(m-B_0 r_m (1+r_m)+m r_m)\\
+  & =B_0-m+B_0 r_m-m+B_0 r_m (1+r_m)-m r_m\\
+  & =B_0-m+B_0 r_m-m + B_0 r_m + B_0 r_m^2-m r_m\\
+  & = B_0 r_m^2 + 2 B_0 r_m + B_0-m-m -m r_m\\
+  & = B_0 (r_m^2 + 2 r_m + 1) - m-m r_m - m\\
+  & = B_0 (r_m^2 + 2 r_m + 1) - m (1+r_m) - m\\
+  & = B_0 (1+r_m)^2 - m (1+r_m) - m\\
+\end{aligned}
+$$
+Determining principal, interest and balance at the end of Month 3 
+
+$$
+\begin{aligned}
+i_3 & =B_2 r_m\\
+ & =(B_0 (1+r_m)^2 - m (1+r_m) - m)r_m\\
+p_3 & =m-i_3\\
+  & =m-((B_0 (1+r_m)^2 - m (1+r_m) - m)r_m)\\
+B_3 & =B_0-p_1-p_2-p_3\\
+  & =B_0-(m-B_0 r_m)-(m-B_0 r_m (1+r_m)+m r_m)-(m-((B_0 (1+r_m)^2 - m (1+r_m) - m)r_m))\\
+  & =B_0-m+B_0 r_m-m+B_0 r_m (1+r_m)-m r_m-m+((B_0 (1+r_m)^2 - m (1+r_m) - m)r_m))\\
+  & =B_0-m+B_0 r_m-m+B_0 r_m (1+r_m)-m r_m-m+B_0 r_m (1+r_m)^2 - r_m m (1+r_m) - r_m m\\
+  & =B_0
+  +B_0 r_m
+  +B_0 r_m (1+r_m)
+  +B_0 r_m (1+r_m)^2 
+  -m
+  -m
+  -m r_m
+  -m
+  - r_m m (1+r_m) 
+  - r_m m\\
+    & =B_0
+  +B_0 r_m
+  +B_0 r_m (1+r_m)
+  +B_0 r_m (r_m^2+2 r_m + 1) 
+  -m
+  -m
+  -m r_m
+  -m
+  - r_m m (1+r_m) 
+  - r_m m\\
+      & =B_0
+  +B_0 r_m
+  +B_0 (r_m^2+r_m)
+  +B_0  (r_m^3+2 r_m^2 + r_m) 
+  -m
+  -m
+  -m r_m
+  -m
+  - m (r_m^2+r_m) 
+  - r_m m\\
+      & =B_0 (
+  1
+  +r_m
+  +(r_m^2+r_m)
+  +(r_m^3+2 r_m^2 + r_m) 
+  )
+  -m
+  -m
+  -m r_m
+  -m
+  - m r_m^2-m r_m 
+  - r_m m\\
+  & =B_0 (
+  r_m^3
+   +3 r_m^2 
+ +3 r_m
+    +1
+  )
+  -m
+  -m
+  -m r_m
+  -m
+  - m r_m^2-m r_m 
+  - r_m m\\
+  & =B_0 (
+  r_m^3
+   +3 r_m^2 
+ +3 r_m
+    +1
+  )
+  - m r_m^2
+  -m r_m
+  -m r_m 
+  -m
+  -m
+  - r_m m
+    -m\\
+  & =B_0 (
+  r_m^3
+   +3 r_m^2 
+ +3 r_m
+    +1
+  )
+  - m (r_m^2
+  + 2 r_m
+  +1)
+  -m (
+   r_m + 1
+  )
+    -m\\
+  & =B_0 (1+ r_m)^3
+  - m (1+r_m)^2
+  -m (
+   1+r_m 
+  )
+    -m\\
+\end{aligned}
+$$
+
+At the end of month 360 (for 30 year loan), we have:
+
+$$
+\begin{aligned}
+ B_{360} & =B_0 (1+ r_m)^{360}
+  - m (1+r_m)^{359}
+  - m (1+r_m)^{358}
+  ...
+    -m\\
+ & =B_0 (1+ r_m)^{360}
+  - \left[ 
+  m (1+r_m)^{359}
+  + m (1+r_m)^{358}
+  ...
+  +m \right]
+\end{aligned}
+$$
+To derive *m*,  observe that *m* coefficient terms
+represent a geometric series, which is nominally specified:
+
+
+$$
+\begin{aligned}
+S_n = a r^0 + a r^1 + ... +a r^n = \sum_{k=0}^n a r^k
+\end{aligned}
+$$
+The closed form solution for a geometric series is:
+
+$$
+\begin{aligned}
+S_n = 
+\begin{cases}
+a (n+1) & r=1 \\
+a \left(\frac{1-r^{n+1}}{1-r}\right) & r\ne1
+\end{cases}
+\end{aligned}
+$$
+Substituting loan variables:
+
+$$
+\begin{aligned}
+r_m & \ne 0\\
+S_n &= m \left(\frac{1-(1+r_m)^{n+1}}{1-(1+r_m)}\right)
+\end{aligned}
+$$
+Replacing the 2nd to nth terms in the partial sum:
+
+$$
+\begin{aligned}
+r_m & \ne 0\\
+B_{360} & =B_0 (1+ r_m)^{360} -  S_{359}\\
+B_{360} & =B_0 (1+ r_m)^{360} -  m \left(\frac{1-(1+r_m)^{360}}{1-(1+r_m)}\right)\\
+\end{aligned}
+$$
+
+The final balance B~360~ is zero, allowing us to isolate *m*:
+
+$$
+\begin{aligned}
+0 & =B_0 (1+ r_m)^{360} -  m \left(\frac{1-(1+r_m)^{360}}{1-(1+r_m)}\right)\\
+m \left(\frac{1-(1+r_m)^{360}}{1-(1+r_m)}\right) & =B_0 (1+ r_m)^{360} \\
+m & =B_0 (1+ r_m)^{360} \left(\frac{1-(1+r_m)}{1-(1+r_m)^{360}}\right) \\
+ & =B_0 (1+ r_m)^{360} \left(\frac{r_m}{(1+r_m)^{360}-1}\right) \\
+ & =B_0 r_m \frac {(1+ r_m)^{360}}{(1+r_m)^{360}-1} \\
+ & =B_0 \frac{r_m}{1-(1+r_m)^{-360}} 
+\end{aligned}
+$$
+
+For the corner case  r~m~ = 0, we substitute
+
+$$
+\begin{aligned}
+r_m &= 0 \\
+0 & =B_0 (1+ r_m)^{360} -  S_{359}\\
+0 & =B_0 -  m 360\\
+m &=\frac{B_0}{360}
+\end{aligned}
+$$
 
 
 # Appendix: Listing of R Code used in this Document
