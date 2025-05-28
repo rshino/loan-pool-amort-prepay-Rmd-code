@@ -2,6 +2,8 @@
 title: "Mortgage Loan & Pool Amortization & Prepay Mechanics"
 author: "Rei Shinozuka rei@reishinozuka.com"
 date: "2025-05-28"
+params:
+    run_heavy_simulation: FALSE
 output:
   pdf_document: 
     number_sections: yes
@@ -17,13 +19,14 @@ output:
 ```{r setup, include=FALSE}
 # where possible, I tried to minimize dependencies and libraries
 # for example, we use base R plotting rather than ggplot2
+# if you need to bail somewhere, use knitr::knit_exit()
+
 library(dplyr)
 library(data.table)
 library(kableExtra)
 library(nortest)
 knitr::opts_chunk$set(echo = FALSE,warning=FALSE,
                       fig.pos='H',fig.width=6,fig.height=2.85,dpi=300)
-bail<-TRUE
 # global parameters are below
 # as demonstration code, we use global parameters for repeated exemplars
 sched.prin.col<-"paleturquoise3"
@@ -375,223 +378,19 @@ B_i & =B_{i-1}-p_1\\
    & =B_{i-1}(1+r_m)-m
 \end{aligned}
 $$
-
-Determining principal, interest and balance at the end of Month 1.
-*B~0~* is the original balance, *m* is the monthly borrower payment,
-*r~m~* is the monthly interest rate, *i~1~* is interest amount in month 1,
-*p~1~* is the principal in month 1 and *B~1~* is the balance at the end of month 1.
+The monthly payment is determined as:
 
 $$
 \begin{aligned}
-i_1 & =B_0 r_m\\
-p_1 & =m-B_0 r_m\\
-B_1 & =B_0-p_1\\
-   & =B_0-(m-B_0 r_m)\\
-   & =B_0+B_0 r_m-m\\
-   & =B_0(1+r_m)-m
-\end{aligned}
-$$
-
-Determining principal, interest and balance at the end of Month 2 
-
-
-$$
-\begin{aligned}
-i_2 & =B_1 r_m\\
- & =(B_0(1+r_m)-m)r_m\\
- & =B_0 r_m (1+r_m)-m r_m\\
-p_2 & =m-i_2\\
-  & =m-(B_0 r_m (1+r_m)-m r_m)\\
-  & =m-B_0 r_m (1+r_m)+m r_m\\
-B_2 & =B_0-p_1-p_2\\
-  & =B_0-(m-B_0 r_m)-(m-B_0 r_m (1+r_m)+m r_m)\\
-  & =B_0-m+B_0 r_m-m+B_0 r_m (1+r_m)-m r_m\\
-  & =B_0-m+B_0 r_m-m + B_0 r_m + B_0 r_m^2-m r_m\\
-  & = B_0 r_m^2 + 2 B_0 r_m + B_0-m-m -m r_m\\
-  & = B_0 (r_m^2 + 2 r_m + 1) - m-m r_m - m\\
-  & = B_0 (r_m^2 + 2 r_m + 1) - m (1+r_m) - m\\
-  & = B_0 (1+r_m)^2 - m (1+r_m) - m\\
-\end{aligned}
-$$
-Determining principal, interest and balance at the end of Month 3 
-
-$$
-\begin{aligned}
-i_3 & =B_2 r_m\\
- & =(B_0 (1+r_m)^2 - m (1+r_m) - m)r_m\\
-p_3 & =m-i_3\\
-  & =m-((B_0 (1+r_m)^2 - m (1+r_m) - m)r_m)\\
-B_3 & =B_0-p_1-p_2-p_3\\
-  & =B_0-(m-B_0 r_m)-(m-B_0 r_m (1+r_m)+m r_m)-(m-((B_0 (1+r_m)^2 - m (1+r_m) - m)r_m))\\
-  & =B_0-m+B_0 r_m-m+B_0 r_m (1+r_m)-m r_m-m+((B_0 (1+r_m)^2 - m (1+r_m) - m)r_m))\\
-  & =B_0-m+B_0 r_m-m+B_0 r_m (1+r_m)-m r_m-m+B_0 r_m (1+r_m)^2 - r_m m (1+r_m) - r_m m\\
-  & =B_0
-  +B_0 r_m
-  +B_0 r_m (1+r_m)
-  +B_0 r_m (1+r_m)^2 
-  -m
-  -m
-  -m r_m
-  -m
-  - r_m m (1+r_m) 
-  - r_m m\\
-    & =B_0
-  +B_0 r_m
-  +B_0 r_m (1+r_m)
-  +B_0 r_m (r_m^2+2 r_m + 1) 
-  -m
-  -m
-  -m r_m
-  -m
-  - r_m m (1+r_m) 
-  - r_m m\\
-      & =B_0
-  +B_0 r_m
-  +B_0 (r_m^2+r_m)
-  +B_0  (r_m^3+2 r_m^2 + r_m) 
-  -m
-  -m
-  -m r_m
-  -m
-  - m (r_m^2+r_m) 
-  - r_m m\\
-      & =B_0 (
-  1
-  +r_m
-  +(r_m^2+r_m)
-  +(r_m^3+2 r_m^2 + r_m) 
-  )
-  -m
-  -m
-  -m r_m
-  -m
-  - m r_m^2-m r_m 
-  - r_m m\\
-  & =B_0 (
-  r_m^3
-   +3 r_m^2 
- +3 r_m
-    +1
-  )
-  -m
-  -m
-  -m r_m
-  -m
-  - m r_m^2-m r_m 
-  - r_m m\\
-  & =B_0 (
-  r_m^3
-   +3 r_m^2 
- +3 r_m
-    +1
-  )
-  - m r_m^2
-  -m r_m
-  -m r_m 
-  -m
-  -m
-  - r_m m
-    -m\\
-  & =B_0 (
-  r_m^3
-   +3 r_m^2 
- +3 r_m
-    +1
-  )
-  - m (r_m^2
-  + 2 r_m
-  +1)
-  -m (
-   r_m + 1
-  )
-    -m\\
-  & =B_0 (1+ r_m)^3
-  - m (1+r_m)^2
-  -m (
-   1+r_m 
-  )
-    -m\\
-\end{aligned}
-$$
-
-At the end of month 360 (for 30 year loan), we have:
-
-$$
-\begin{aligned}
- B_{360} & =B_0 (1+ r_m)^{360}
-  - m (1+r_m)^{359}
-  - m (1+r_m)^{358}
-  ...
-    -m\\
- & =B_0 (1+ r_m)^{360}
-  - \left[ 
-  m (1+r_m)^{359}
-  + m (1+r_m)^{358}
-  ...
-  +m \right]
-\end{aligned}
-$$
-To derive *m*,  observe that *m* coefficient terms
-represent a geometric series, which is nominally specified:
-
-
-$$
-\begin{aligned}
-S_n = a r^0 + a r^1 + ... +a r^n = \sum_{k=0}^n a r^k
-\end{aligned}
-$$
-The closed form solution for a geometric series is:
-
-$$
-\begin{aligned}
-S_n = 
+m = 
 \begin{cases}
-a (n+1) & r=1 \\
-a \left(\frac{1-r^{n+1}}{1-r}\right) & r\ne1
+B_0 \frac{r_m}{1-(1+r_m)^{-360}}  & ,r_m \ne 0 \\
+\frac{B_0}{360} & ,r_m = 0
 \end{cases}
 \end{aligned}
 $$
-Substituting loan variables:
-
-$$
-\begin{aligned}
-r_m & \ne 0\\
-S_n &= m \left(\frac{1-(1+r_m)^{n+1}}{1-(1+r_m)}\right)
-\end{aligned}
-$$
-Replacing the 2nd to nth terms in the partial sum:
-
-$$
-\begin{aligned}
-r_m & \ne 0\\
-B_{360} & =B_0 (1+ r_m)^{360} -  S_{359}\\
-B_{360} & =B_0 (1+ r_m)^{360} -  m \left(\frac{1-(1+r_m)^{360}}{1-(1+r_m)}\right)\\
-\end{aligned}
-$$
-
-The final balance B~360~ is zero, allowing us to isolate *m*:
-
-$$
-\begin{aligned}
-0 & =B_0 (1+ r_m)^{360} -  m \left(\frac{1-(1+r_m)^{360}}{1-(1+r_m)}\right)\\
-m \left(\frac{1-(1+r_m)^{360}}{1-(1+r_m)}\right) & =B_0 (1+ r_m)^{360} \\
-m & =B_0 (1+ r_m)^{360} \left(\frac{1-(1+r_m)}{1-(1+r_m)^{360}}\right) \\
- & =B_0 (1+ r_m)^{360} \left(\frac{r_m}{(1+r_m)^{360}-1}\right) \\
- & =B_0 r_m \frac {(1+ r_m)^{360}}{(1+r_m)^{360}-1} \\
- & =B_0 \frac{r_m}{1-(1+r_m)^{-360}} 
-\end{aligned}
-$$
-For the corner case  r~m~ = 0, we substitute
 
 
-$$
-\begin{aligned}
-r_m &= 0 \\
-0 & =B_0 (1+ r_m)^{360} -  S_{359}\\
-0 & =B_0 -  m 360\\
-m &=\frac{B_0}{360}
-\end{aligned}
-$$
 
 
 ```{r amortization}
@@ -1188,6 +987,7 @@ $$
 SMM_i &= \frac{p_{U,i}}{B_{S,i}}\\
 \end{aligned}
 $$
+
 In deriving prepayment, we would typically be provided actual rather than scheduled balances, so we rewrite as:
 
 $$
@@ -1195,6 +995,7 @@ $$
 SMM_i &= \frac{p_{U,i}}{B_{A,i}+p_{U,i}}\\
 \end{aligned}
 $$
+
 The variables for SMM~i~ and CPR~i~ used to this point have a term of 1 month; i.e., 
 they capture 1 month of prepayments from month *i-1* to *i*. As we'll see, the 1 month prepayment 
 tends to be volatile when inferring from historical or simulated loan data.
@@ -1267,8 +1068,6 @@ plot.hist.cpr(cfsim,title,baseline.cpr=scalar.cpr)
 ```
 
 
-
-
 ### Loan Count and Pool Paydown
 
 
@@ -1291,6 +1090,16 @@ time<-system.time(
   big.cfsim<-simulate.loan.pool.f(orig.term,note.rate,orig.bal,scalar.cpr,big.loan.count)
   )
 title<-sprintf("%d Loan Pool Simulation",big.loan.count)
+print.time.stats(time,title=title)
+```
+
+
+```{r yuge.pool.simulation}
+set.seed(666) # replicable in isolation
+time<-system.time(
+  yuge.cfsim<-simulate.loan.pool.f(orig.term,note.rate,orig.bal,scalar.cpr,yuge.loan.count)
+  )
+title<-sprintf("%d Loan Pool Simulation",yuge.loan.count)
 print.time.stats(time,title=title)
 ```
 
@@ -1319,6 +1128,11 @@ plot.cfs(cfsim,title)
 title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",
                 note.rate*100,big.loan.count,scalar.cpr*100)
 plot.cfs(big.cfsim,title)
+
+
+title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",
+                note.rate*100,yuge.loan.count,scalar.cpr*100)
+plot.cfs(yuge.cfsim,title)
 ```
 
 
@@ -1326,7 +1140,7 @@ CPR derived from the small, medium and large simulations:
 
 
 ```{r alt.sim.cpr}
-#| fig.cap=c('Small Pool Historical CPR','Medium Pool Historical CPR','Large Pool Historical CPR')
+#| fig.cap=c('Small Pool Historical CPR','Medium Pool Historical CPR','Large Pool Historical CPR','Very Large Pool Historical CPR')
 
 title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",
                note.rate*100,small.loan.count,scalar.cpr*100)
@@ -1341,12 +1155,17 @@ cat('\n\n')
 title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",
                note.rate*100,big.loan.count,scalar.cpr*100)
 plot.hist.cpr(big.cfsim,title,baseline.cpr=scalar.cpr)
+
+cat('\n\n')
+title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",
+               note.rate*100,yuge.loan.count,scalar.cpr*100)
+plot.hist.cpr(yuge.cfsim,title,baseline.cpr=scalar.cpr)
 ```
 
 
 # Simulation of Loan Pool Prepayments
 
-Example C in the prior section showed single simulation of a pool of mortgage loans.
+Example in the prior section showed single simulation of a pool of mortgage loans.
 
 The simulations in this section
 execute 250 or more random trials of pool simulation in the manner of the last example. 
@@ -1370,12 +1189,6 @@ We describe simulated data:
 In the statistical tests the null hypothesis H0 is that the data is normal. A p-value less than the significance threshold (0.01, 0.05) indicates 
 evidence that H0 (normality) is not true.
 
-```{r early_exit}
-if(bail)
-{
-  knitr::knit_exit()
-}
-```
 
 ```{r sim.trials_f}
 # sim.trials(min.cutoff,max.cutoff,loan.count) ===========================================
@@ -1391,9 +1204,6 @@ sim.trials<-function(min.cutoff=1,max.cutoff,loan.count){
         list(hist.cpr[seq(pmax(min.cutoff,3),pmin(max.cutoff,months),by=3),cpr03]),
         list(hist.cpr[seq(pmax(min.cutoff,6),pmin(max.cutoff,months),by=6),cpr06]),
         list(hist.cpr[seq(pmax(min.cutoff,12),pmin(max.cutoff,months),by=12),cpr12]))
-        #list(hist.cpr[min.cutoff:max.cutoff,cpr03]),
-        #list(hist.cpr[min.cutoff:max.cutoff,cpr06]),
-        #list(hist.cpr[min.cutoff:max.cutoff,cpr12]))
   )
 }# sim.trials()
 ```
@@ -1622,7 +1432,11 @@ show.pool.sim.results(sim=sim)
 show.norm.stat(sim,"%s norm-QQ (%d loans)")
 ```
 
-```{r med.pool.simulation.trials,results='asis'}
+```{r results='asis',eval=!params$run_heavy_simulation}
+cat(sprintf("\n\n## SKIPPING LARGE SIMULATIONS\n",lc))
+```
+
+```{r med.pool.simulation.trials,results='asis',eval=params$run_heavy_simulation}
 #| fig.cap=c('Medium Pool 1m, 3m CPR','Medium Pool 6m, 12m CPR','Medium Pool CPR Q-Q')
 
 lc<-250
@@ -1635,7 +1449,7 @@ show.pool.sim.results(sim=sim)
 show.norm.stat(sim,"%s norm-QQ (%d loans)")
 ```
 
-```{r medbig.pool.simulation.trials,results='asis'}
+```{r medbig.pool.simulation.trials,results='asis',eval=params$run_heavy_simulation}
 #| fig.cap=c('Medium/Large Pool 1m, 3m CPR','Medium/Large Pool 6m, 12m CPR','Medium/Large Pool CPR Q-Q')
 
 lc<-500
@@ -1649,7 +1463,7 @@ show.norm.stat(sim,"%s norm-QQ (%d loans)")
 ```
 
 
-```{r big.pool.simulation.trials,results='asis'}
+```{r big.pool.simulation.trials,results='asis',eval=params$run_heavy_simulation}
 #| fig.cap=c('Large Pool 1m, 3m CPR','Large Pool 6m, 12m CPR','Large Pool CPR Q-Q')
 
 lc<-1000
@@ -1662,7 +1476,15 @@ show.pool.sim.results(sim=sim)
 show.norm.stat(sim,"%s norm-QQ (%d loans)")
 ```
 
-# Appendix: Formulae
+# Appendix: Mortgage Formulae
+
+Scope: Fixed-Rate Level-Pay mortgages
+
+  * Fixed-Rate: constant interest rate over the life of the loan
+  
+  * Level-Pay: Loan is structured such that monthly payment is constant over the life of the loan.
+
+The level-pay structure is facilitated by *amortizing* the balance over the life of the loan after paying monthly interest. The amount of the amortization is known as the *scheduled principal* and the remaining balance is known as the *scheduled balance*.
 
 
 Each month the borrower remits the scheduled monthly payment *m*, comprising of interest *i~i~* and principal *p~i~*, the reduction of principal resulting in a monthly
@@ -1712,7 +1534,6 @@ B_2 & =B_0-p_1-p_2\\
   & =B_0-m+B_0 r_m-m+B_0 r_m (1+r_m)-m r_m\\
   & =B_0-m+B_0 r_m-m + B_0 r_m + B_0 r_m^2-m r_m\\
   & = B_0 r_m^2 + 2 B_0 r_m + B_0-m-m -m r_m\\
-  & = B_0 (r_m^2 + 2 r_m + 1) - m-m r_m - m\\
   & = B_0 (r_m^2 + 2 r_m + 1) - m (1+r_m) - m\\
   & = B_0 (1+r_m)^2 - m (1+r_m) - m\\
 \end{aligned}
@@ -1818,7 +1639,7 @@ B_3 & =B_0-p_1-p_2-p_3\\
 \end{aligned}
 $$
 
-At the end of month 360 (for 30 year loan), we have:
+Generalizing from the above a 30 year loan would we have:
 
 $$
 \begin{aligned}
@@ -1828,11 +1649,11 @@ $$
   ...
     -m\\
  & =B_0 (1+ r_m)^{360}
-  - \left[ 
+  - \left[ \ 
   m (1+r_m)^{359}
   + m (1+r_m)^{358}
   ...
-  +m \right]
+  +m \ \right]
 \end{aligned}
 $$
 To derive *m*,  observe that *m* coefficient terms
