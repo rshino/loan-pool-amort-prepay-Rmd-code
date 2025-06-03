@@ -3,8 +3,9 @@ title: "Mortgage Loan & Pool Amortization & Prepay Mechanics"
 author: "Rei Shinozuka rei@reishinozuka.com"
 date: "2025-05-28"
 params:
-    run_heavy_simulation: FALSE
+    run_heavy_simulation: TRUE
 output:
+ 
   pdf_document: 
     number_sections: yes
     fig_caption: yes
@@ -13,7 +14,9 @@ output:
       keep_tex: yes
       header-includes: 
         - \usepackage{longtable}
-  html_document: default
+  html_document: 
+    number_sections: yes
+    fig_caption: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -378,18 +381,21 @@ B_i & =B_{i-1}-p_1\\
    & =B_{i-1}(1+r_m)-m
 \end{aligned}
 $$
-The monthly payment is determined as:
+The monthly payment is calculated from note rate, balance, and loan term. 
+*r~m~* is the monthly interest rate, or $\frac{note rate}{12}$, *B~0~* is 
+the original loan balance and *T* is term of the loan in months.
+
 
 $$
 \begin{aligned}
 m = 
 \begin{cases}
-B_0 \frac{r_m}{1-(1+r_m)^{-360}}  & ,r_m \ne 0 \\
-\frac{B_0}{360} & ,r_m = 0
+B_0 \frac{r_m}{1-(1+r_m)^{-T}}  & ,r_m \ne 0 \\
+\frac{B_0}{T} & ,r_m = 0
 \end{cases}
 \end{aligned}
 $$
-
+Derivation is in the appendix.
 
 
 
@@ -405,8 +411,8 @@ plot.cfs(cfloan,title)
 
 ```
 
-
-Monthly payment is:
+For our example loan, the
+monthly payment is:
 
 $$
 \begin{aligned}
@@ -415,7 +421,7 @@ m & =B_0 \frac{r_m}{1-(1+r_m)^{-360}} \\
  & =`r round(orig.bal*(note.rate/12)/(1-(1+note.rate/12)^(-360)),2)` 
 \end{aligned}
 $$
-First month: 
+The first month principal, interest and remaining balance is:
 
 
 $$
@@ -450,6 +456,7 @@ cfloan<-amort.loan.cf(orig.term,note.rate,orig.bal,cprsingle)
 title<-sprintf("%3.3f%% Loan Payment in Full at month %3d",note.rate*100, pif.mon)
 plot.cfs(cfloan,title)
 ```
+
 
 ### Loan Curtailments
 
@@ -883,18 +890,24 @@ plot.comp.bals(cfsim,cfpool,title)
 #
 calc.hist.cpr<-function(cf){
   orig.term<-nrow(cf)
+  last.cf<-sum(cf$bbal>0)
+
   hist.cpr<-data.table(mon=1:orig.term)
   hist.cpr$bbal<-cf$bbal
   hist.cpr$ebal<-cf$ebal
+  hist.cpr$sched.prin<-cf$sched.prin
   hist.cpr$unsched.prin<-cf$unsched.prin
-  hist.cpr[,wam:=orig.term-mon]
+  # hist.cpr[,wam:=orig.term-mon]
   # collect trailing 1,3,6,12-month unscheduled principal
   # this is the only section requiring shift(1..11)
-  hist.cpr[bbal>0,uprin01:=unsched.prin]  
-  hist.cpr[bbal>0,uprin03:=uprin01+shift(unsched.prin,1)+shift(unsched.prin,2)]
-  hist.cpr[bbal>0,uprin06:=uprin03+shift(unsched.prin,3)+shift(unsched.prin,4)+
+  hist.cpr[(bbal>0),uprin01:=unsched.prin]  
+  hist.cpr[(bbal>0)&(mon<last.cf-2),
+           uprin03:=uprin01+shift(unsched.prin,1)+shift(unsched.prin,2)]
+  hist.cpr[(bbal>0)&(mon<last.cf-5),
+           uprin06:=uprin03+shift(unsched.prin,3)+shift(unsched.prin,4)+
              shift(unsched.prin,5)]
-  hist.cpr[bbal>0,uprin12:=uprin06+shift(unsched.prin,6)+shift(unsched.prin,7)+
+  hist.cpr[(bbal>0)&(mon<last.cf-11),
+           uprin12:=uprin06+shift(unsched.prin,6)+shift(unsched.prin,7)+
              shift(unsched.prin,8)+shift(unsched.prin,9)+
              shift(unsched.prin,10)+shift(unsched.prin,11)]
   # determine 1-,3-,6-,12-mo scheduled ending balances for month m
@@ -980,7 +993,10 @@ plot.hist.cpr<-function(cf,title=NA,baseline.cpr=NA){
 Given the loan and pool monthly balances and unscheduled principal payments, 
 we reverse the process to
 infer prepayments as SMM values, annualized as CPRs.
-As shown earlier:
+
+## Monthly Prepayments
+
+As defined earlier:
 
 $$
 \begin{aligned}
@@ -996,11 +1012,16 @@ SMM_i &= \frac{p_{U,i}}{B_{A,i}+p_{U,i}}\\
 \end{aligned}
 $$
 
-The variables for SMM~i~ and CPR~i~ used to this point have a term of 1 month; i.e., 
+The variables for SMM~i~ and CPR~i~ used to this point have captured prepayments 
+in a single month; i.e., 
 they capture 1 month of prepayments from month *i-1* to *i*. As we'll see, the 1 month prepayment 
 tends to be volatile when inferring from historical or simulated loan data.
-For this reason, it is common to measure prepayment
-terms of 3-, 6- and 12 months.
+
+## Term or Average Prepayments
+
+The greater stability of a longer prepayment term better accommodates the comparison of prepayments between different cohorts, or a cohort and a model. 
+A Term Prepayment, or Average Prepayment (*SF1999* p.SF-11)
+measures prepayment occurring over longer time periods, commonly 3-, 6- and 12 months.
 ^[Terms longer than 12 months are sometimes reported, such as Since-Issue CPR representing the constant CPR which applied to the pool from origination to today would calculate a balance equaling today's balance.]
 
 For example, a 3m SMM at time *i* 
@@ -1013,22 +1034,63 @@ reflects amortization from last month's actual balance, but today's 3 month sche
 balance reflects amortization from the actual balance 3 months ago.]
 at month *i* 
 would be *B~A,i* + *p~U,i-2~* + *p~U,i-1~* + *p~U,i~*.
-This can be written
+The 3 month SMM is specified:
 
 $$
 \begin{aligned}
 SMM_{3,i} &= \sqrt[3]{\frac{\sum_{k=i-2}^{i}p_{U,k}}{B_{A,i}+\sum_{k=i-2}^{i}p_{U,k}}}\\
 \end{aligned}
 $$
-The 12-month measure captures a full year is free from 
-seasonal variation.
+The 12-month SMM has the virtue of being free from 
+seasonal variation. The n=month SMM is:
 
 $$
 \begin{aligned}
-SMM_{12,i} &= \sqrt[12]{\frac{\sum_{k=i-11}^{i}p_{U,k}}{B_{A,i}+\sum_{k=i-11}^{i}p_{U,k}}}\\
+SMM_{n,i} &= \sqrt[n]{\frac{\sum_{k=i+1-n}^{i}p_{U,k}}{B_{A,i}+\sum_{k=i+1-n}^{i}p_{U,k}}}\\
 \end{aligned}
 $$
-The term SMM measures are geometric averages expressed as 1-month equivalents, and can be converted to corresponding term CPR in the usual way.
+
+
+The term SMM measures 
+are geometric averages expressed as 1-month equivalents, and can be converted to corresponding term CPR in the usual way.
+
+$$
+\begin{aligned}
+CPR_{n,i} &= 1-(1-SMM_{n,i})^{12} \\
+\end{aligned}
+$$
+
+
+## Limitations of Term Prepayments
+
+
+At loan maturity, both scheduled and actual balances are zero.
+
+$$
+\begin{aligned}
+B_{A,T} = B_{S,T} = 0
+\end{aligned}
+$$
+
+This would also be expected at pool stated maturity.
+^[Stated maturity is the latest maturity of all loans in the original pool, 
+given no early payments.]
+Loan curtailments could accelerate paydown prior to the contractual or stated maturity.
+*T* represents the earlier (lower) of original term and month of paydown. 
+Any historical prepayment ending at month *T* would be the ratio of unscheduled principal
+to (zero) scheduled balance, an undefined quantity.
+
+$$
+\begin{aligned}
+SMM_{n,i} = 
+\begin{cases}
+\sqrt[n]{\frac{\sum_{k=i+1-n}^{i}p_{U,k}}{B_{A,i}+\sum_{k=i+1-n}^{i}p_{U,k}}} &, n+i<T\\
+undefined &,n+i\ge T
+\end{cases}
+\end{aligned}
+$$
+
+## Single Loan Prepayments
 
 The observed CPR for a loan shows either payment-in-full (100 CPR) or monthly curtailment.
 
@@ -1039,6 +1101,8 @@ title<-sprintf("Single %3.3f%% Loan Cashflow %3.1f%% CPR Curtailments",
                note.rate*100,scalar.cpr*100)
 plot.hist.cpr(cfloan,title,baseline.cpr=scalar.cpr)
 ```
+
+## MBS Convention Pool Prepayments
 
 The observed CPR for an MBS convention pool will return the prepayment vector used 
 to pay down the pool.
@@ -1051,11 +1115,15 @@ title<-sprintf("MBS Convention %3.3f%% Pool Cashflows, %3.1f%% CPR",
 plot.hist.cpr(cfpool,title,baseline.cpr=scalar.cpr)
 ```
 
-The loan simulation case will most closely highlight measurement of 
+## Loan Simulation Pool Prepayments
+
+Backing out prepayments from simulation is the object of this exercise, as 
+it replicates the mechanics of measuring  
 historical prepayments.
 Here the observed CPR will reflect the paydowns of individual loans in the pool, 
 and will evince the largely discrete characteristic of prepayments. 
-The 12-month CPR is significantly more stable than the shorter term measures, as 
+We can visually discern the stability of the 12-month CPR versus
+the shorter term prepayment measures. 
 will be quantified in a later section.
 
 
@@ -1113,7 +1181,7 @@ prepayments at a
 
 
 ```{r alt.pool.simulation.results}
-#| fig.cap=c('Small Pool Simulation','Medium Pool Simulation','Large Pool Simulation')
+#| fig.cap=c('Small Pool Simulation','Medium Pool Simulation','Large Pool Simulation', 'Very Large Pool Simulation')
 
 title<-sprintf("%3.3f%% Pool Loan Simulation Cashflows, %d Loans, %3.1f%% CPR",
                 note.rate*100,small.loan.count,scalar.cpr*100)
